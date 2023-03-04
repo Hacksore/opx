@@ -48,6 +48,6 @@ Done in 0.56s.
 - How do you handle different environment dimensions (.env.local vs .env.production, etc)
 
 ### TODO
-- [] Allow a user defined node package manager 
-- [] Support for more than just the node ecosystem
-- [] Allow a custom script to be passed in
+- [ ] Allow a user defined node package manager 
+- [ ] Support for more than just the node ecosystem
+- [ ] Allow a custom script to be passed in
