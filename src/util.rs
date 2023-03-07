@@ -23,7 +23,7 @@ pub fn is_skip_dir(entry: &DirEntry) -> bool {
 }
 
 /// Run the `op` command with all the `.env` vars files found in the current directory
-pub fn run_op_command(env_files: Vec<DirEntry>) { 
+pub fn run_op_command(env_files: Vec<DirEntry>, verb: &str) { 
   let current_dir = env::current_dir();
   let mut current_dir_string = String::from("");
   match &current_dir {
@@ -56,9 +56,10 @@ pub fn run_op_command(env_files: Vec<DirEntry>) {
     // TODO: allow custom pkg manager
     .arg("yarn")
     // TODO: allow custom command
-    .arg("start")
-    .arg("--color")
-    .arg("always")
+    .arg(verb)
+    // .arg("start")
+    // .arg("--color")
+    // .arg("always")
     .status()
     .expect("Failed to execute command");
 
