@@ -1,4 +1,4 @@
-use std::{env, ffi::OsStr};
+use std::{env};
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
 
