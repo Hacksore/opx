@@ -1,6 +1,6 @@
+use std::env;
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
-use std::{env};
 
 pub fn is_env_file(entry: &DirEntry) -> bool {
   entry.file_type().is_file()
@@ -23,7 +23,32 @@ pub fn is_skip_dir(entry: &DirEntry) -> bool {
 }
 
 /// Run the `op` command with all the `.env` vars files found in the current directory
-pub fn run_op_command(args: Vec<String>) -> Result<(), std::io::Error> {
+pub fn run_op_command(env_files: Vec<DirEntry>) { 
+  let current_dir = env::current_dir();
+  let mut current_dir_string = String::from("");
+  match &current_dir {
+    Ok(dir) => {
+      current_dir_string = dir.to_string_lossy().to_string();
+    }
+    Err(_) => {
+      // do nothing
+    }
+  }
+
+  // print out a list of all the ENV files sourced
+  env_files.iter().for_each(|e| {
+    let env_file_path = e.path().display().to_string();   
+    let mut absolute_dir = env_file_path.replace(&current_dir_string, "");
+    absolute_dir.remove(0);
+
+    println!("[File] {}", absolute_dir)
+  });
+
+  let args: Vec<String> = env_files
+    .iter()
+    .map(|s| format!("{}={}", "--env-file", s.path().to_string_lossy()))
+    .collect();
+
   let status = Command::new("op")
     .arg("run")
     .args(args)
@@ -41,13 +66,12 @@ pub fn run_op_command(args: Vec<String>) -> Result<(), std::io::Error> {
     eprintln!("Command failed: {}", status);
   }
 
-  Ok(())
 }
 
 /// Get all `DirEntry` for every `.env` file from the current directory
 pub fn get_env_files() -> Vec<DirEntry> {
   let current_dir = env::current_dir().expect("Failed to get current directory");
-   
+
   // All the dirs with .env files excluding certain skipped folders
   let directories = WalkDir::new(&current_dir)
     .into_iter()
