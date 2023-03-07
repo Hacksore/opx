@@ -1,4 +1,7 @@
-# opx
+# onepassword-secret-util
+
+### Install
+`cargo install onepassword-secret-util`
 
 Sourcing all `.env` files from your working directory.
 

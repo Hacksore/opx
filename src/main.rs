@@ -2,8 +2,8 @@
 
 mod util;
 
-use std::env::{args as dank_args};
 use crate::util::{get_env_files, run_op_command};
+use std::env::args as dank_args;
 
 fn main() {
   let env_files = get_env_files();
@@ -15,4 +15,12 @@ fn main() {
   };
 
   run_op_command(env_files, op_args.into_iter())
+}
+
+
+#[test]
+fn test() {
+  let env_files = get_env_files();
+  let vec = vec!["start".to_string()];
+  run_op_command(env_files, vec.into_iter());
 }
