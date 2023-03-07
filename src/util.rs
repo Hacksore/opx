@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, ffi::OsStr};
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
 
@@ -23,7 +23,7 @@ pub fn is_skip_dir(entry: &DirEntry) -> bool {
 }
 
 /// Run the `op` command with all the `.env` vars files found in the current directory
-pub fn run_op_command(env_files: Vec<DirEntry>, verb: &str) { 
+pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = &'static OsStr>) { 
   let current_dir = env::current_dir();
   let mut current_dir_string = String::from("");
   match &current_dir {
@@ -44,19 +44,19 @@ pub fn run_op_command(env_files: Vec<DirEntry>, verb: &str) {
     println!("[File] {}", absolute_dir)
   });
 
-  let args: Vec<String> = env_files
+  let op_env_flags: Vec<String> = env_files
     .iter()
     .map(|s| format!("{}={}", "--env-file", s.path().to_string_lossy()))
     .collect();
 
   let status = Command::new("op")
     .arg("run")
-    .args(args)
+    .args(op_env_flags)
     .arg("--")
     // TODO: allow custom pkg manager
     .arg("yarn")
     // TODO: allow custom command
-    .arg(verb)
+    .args(args)
     // .arg("start")
     // .arg("--color")
     // .arg("always")
