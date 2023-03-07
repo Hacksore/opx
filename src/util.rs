@@ -23,7 +23,7 @@ pub fn is_skip_dir(entry: &DirEntry) -> bool {
 }
 
 /// Run the `op` command with all the `.env` vars files found in the current directory
-pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = &'static OsStr>) { 
+pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = String>) { 
   let current_dir = env::current_dir();
   let mut current_dir_string = String::from("");
   match &current_dir {

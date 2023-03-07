@@ -3,16 +3,9 @@
 version = 3
 
 [[package]]
-name = "argv"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2f1055db52c224c48c2f2bd86b543fe8985d699eb58b07c9b14db5067674893"
-
-[[package]]
 name = "onepassword-secret-util"
 version = "0.0.1"
 dependencies = [
- "argv",
  "walkdir",
 ]
 
