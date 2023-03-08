@@ -1,9 +1,9 @@
 # onepassword-secret-util
 
+This tool allows you to use the `opx` binary to start an application with all `.env` files passed to `op run ...`. 
+
 ### Install
 `cargo install onepassword-secret-util`
-
-Sourcing all `.env` files from your working directory.
 
 ```
 # start your app with secrets injected
@@ -11,7 +11,7 @@ opx
 ```
 The command above would run this in the background:
 ```
-op run <expandedEnvFiles> -- <pkgManager> <script || "start">
+op run --env-file=.env --env-file=apps/web/.env -- npm start
 ```
 
 ### Demo
@@ -53,4 +53,4 @@ Done in 0.56s.
 ### TODO
 - [ ] Allow a user defined node package manager 
 - [ ] Support for more than just the node ecosystem
-- [ ] Allow a custom script to be passed in
+- [x] Allow a custom script to be passed in

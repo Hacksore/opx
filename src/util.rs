@@ -1,4 +1,4 @@
-use std::{env};
+use std::env;
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
 
@@ -28,7 +28,7 @@ pub fn is_skip_dir(entry: &DirEntry) -> bool {
 }
 
 /// Run the `op` command with all the `.env` vars files found in the current directory
-pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = String>) { 
+pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = String>) {
   let current_dir = env::current_dir();
   let mut current_dir_string = String::from("");
   match &current_dir {
@@ -42,7 +42,7 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = Strin
 
   // print out a list of all the ENV files sourced
   env_files.iter().for_each(|e| {
-    let env_file_path = e.path().display().to_string();   
+    let env_file_path = e.path().display().to_string();
     let mut absolute_dir = env_file_path.replace(&current_dir_string, "");
     absolute_dir.remove(0);
 
@@ -54,12 +54,10 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = Strin
     .map(|s| format!("{}={}", "--env-file", s.path().to_string_lossy()))
     .collect();
 
-  // set force color before running the shell command to make libs like chalk output colors
   let force_color_str = env::var(FORCE_COLOR).unwrap_or_default();
-
-  // parse the string as a boolean
   let force_color: bool = force_color_str.parse().unwrap_or(false);
 
+  // set force color before running the shell command to make libs like chalk output colors
   if !force_color {
     println!("Forcing terminal colors with {}=1", FORCE_COLOR);
     env::set_var(FORCE_COLOR, "1");
@@ -84,7 +82,6 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = Strin
   if !status.success() {
     eprintln!("Command failed: {}", status);
   }
-
 }
 
 /// Get all `DirEntry` for every `.env` file from the current directory
@@ -102,7 +99,7 @@ pub fn get_env_files() -> Vec<DirEntry> {
   for entry in directories {
     if is_env_file(&entry) {
       let cloned = entry.clone();
-      env_files.push(cloned)
+      env_files.push(cloned);
     }
   }
 
