@@ -2,12 +2,17 @@ use std::{env};
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
 
+const FORCE_COLOR: &str = "FORCE_COLOR";
+
+/// Test if a given dir entry is an .env file
+/// TODO: what do you do about dimensions .env.local vs .env.production
+/// naive thought is you need a flag on the CLI for --env <env>
 pub fn is_env_file(entry: &DirEntry) -> bool {
   entry.file_type().is_file()
     && entry
       .file_name()
       .to_str()
-      .map(|s| s.ends_with(".env"))
+      .map(|s| s.starts_with(".env"))
       .unwrap_or(false)
 }
 
@@ -41,7 +46,7 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = Strin
     let mut absolute_dir = env_file_path.replace(&current_dir_string, "");
     absolute_dir.remove(0);
 
-    println!("[File] {}", absolute_dir)
+    println!("[ENV] {}", absolute_dir)
   });
 
   let op_env_flags: Vec<String> = env_files
@@ -49,19 +54,32 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: impl Iterator<Item = Strin
     .map(|s| format!("{}={}", "--env-file", s.path().to_string_lossy()))
     .collect();
 
+  // set force color before running the shell command to make libs like chalk output colors
+  let force_color_str = env::var(FORCE_COLOR).unwrap_or_default();
+
+  // parse the string as a boolean
+  let force_color: bool = force_color_str.parse().unwrap_or(false);
+
+  if !force_color {
+    println!("Forcing terminal colors with {}=1", FORCE_COLOR);
+    env::set_var(FORCE_COLOR, "1");
+  }
+
   let status = Command::new("op")
     .arg("run")
     .args(op_env_flags)
     .arg("--")
     // TODO: allow custom pkg manager
     .arg("yarn")
-    // TODO: allow custom command
     .args(args)
-    // .arg("start")
-    // .arg("--color")
-    // .arg("always")
     .status()
     .expect("Failed to execute command");
+
+  if force_color {
+    env::remove_var(FORCE_COLOR)
+  } else {
+    env::set_var(FORCE_COLOR, "1");
+  }
 
   if !status.success() {
     eprintln!("Command failed: {}", status);
