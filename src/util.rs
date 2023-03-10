@@ -4,15 +4,23 @@ use walkdir::{DirEntry, WalkDir};
 
 const FORCE_COLOR: &str = "FORCE_COLOR";
 
-/// Test if a given dir entry is an .env file
 /// TODO: what do you do about dimensions .env.local vs .env.production
 /// naive thought is you need a flag on the CLI for --env <env>
+fn is_valid_env_file(name: &str) -> bool {
+  if name == ".env" {
+    return true
+  }
+
+  return false;
+}
+
+/// Test if a given dir entry is an .env file
 pub fn is_env_file(entry: &DirEntry) -> bool {
   entry.file_type().is_file()
     && entry
       .file_name()
       .to_str()
-      .map(|s| s.starts_with(".env"))
+      .map(is_valid_env_file)
       .unwrap_or(false)
 }
 
