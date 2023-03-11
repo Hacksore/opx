@@ -17,33 +17,38 @@ op run --env-file=.env --env-file=apps/web/.env -- npm start
 ### Demo
 Working example of it doing the correct thing in a demo repo:
 ```
-master ✗ $ opx
-Running yarn start with secrets expanded from .env files
-yarn run v1.22.19
-$ turbo run start
+opx ✔ $ opx
+[OPX] Can't find config file "opx.json", using default values
+[OPX] Forcing terminal colors with FORCE_COLOR=1
+[ENV] .env
+[ENV] apps/demo/.env
+[ENV] apps/other-app/.env
+[OPX] op run --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/.env --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/apps/demo/.env --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/apps/other-app/.env -- npm start
+
+> demo-1pass-secrets@0.0.0 start
+> turbo run start
+
 • Packages in scope: demo, eslint-config-custom, other-app, tsconfig
 • Running start in 4 packages
 • Remote caching disabled
 demo:start: cache bypass, force executing 545833253ebd38cc
 other-app:start: cache bypass, force executing 2ed51133d14970ce
-demo:start:
 other-app:start:
 other-app:start: > other-app@1.0.0 start
 other-app:start: > node main.js
 other-app:start:
+demo:start:
 demo:start: > demo@1.0.0 start
 demo:start: > node main.js
 demo:start:
-other-app:start: Hello this is a sample app that uses a secret from 1password cli
-other-app:start: Secret is: <concealed by 1Password>
 demo:start: Hello this is a sample app that uses a secret from 1password cli
+other-app:start: Hello this is a sample app that uses a secret from 1password cli
 demo:start: Secret is: <concealed by 1Password>
+other-app:start: Secret is: <concealed by 1Password>
 
  Tasks:    2 successful, 2 total
 Cached:    0 cached, 2 total
-  Time:    315ms
-
-Done in 0.56s.
+  Time:    216ms
 ```
 
 ### Considerations
