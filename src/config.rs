@@ -11,8 +11,7 @@ use std::path::PathBuf;
 pub struct OpxConfig {
   #[serde(skip)]
   pub config_path: Option<PathBuf>,
-  pub package_manager: String,
-  pub testing: String,
+  pub package_manager: String
 }
 
 /// The filename for our config
@@ -27,8 +26,7 @@ impl OpxConfig {
 
     let mut instance = OpxConfig {
       package_manager: String::from("npm"),
-      config_path: Some(config_path.clone()),
-      testing: String::from("default")
+      config_path: Some(config_path.clone())
     };
 
     if !config_path.exists() {      
