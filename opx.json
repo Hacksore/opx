@@ -1,3 +1,4 @@
 {
-  "packageManager": "npm"
+  "packageManager": "yarn",
+  "testing": "123"
 }
