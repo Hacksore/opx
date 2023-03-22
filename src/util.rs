@@ -15,7 +15,7 @@ fn is_valid_env_file(name: &str) -> bool {
 }
 
 /// Test if a given dir entry is an .env file
-pub fn is_env_file(entry: &DirEntry) -> bool {
+pub fn is_real_env_file(entry: &DirEntry) -> bool {
   entry.file_type().is_file()
     && entry
       .file_name()
@@ -84,10 +84,16 @@ pub fn run_op_command(
     .args(args);
 
   let command_args: Vec<_> = command.get_args().map(|s| s.to_string_lossy()).collect();
-  println!("[OPX] {} {}", command.get_program().to_string_lossy(), command_args.join(" ")) ;
+  println!(
+    "[OPX] {} {}",
+    command.get_program().to_string_lossy(),
+    command_args.join(" ")
+  );
 
   let mut command_spawn = command.spawn().expect("Failed to execute command");
-  let status = command_spawn.wait().expect("Failed to wait for child process");
+  let status = command_spawn
+    .wait()
+    .expect("Failed to wait for child process");
 
   if force_color {
     env::remove_var(FORCE_COLOR)
@@ -113,7 +119,7 @@ pub fn get_env_files() -> Vec<DirEntry> {
   let mut env_files: Vec<DirEntry> = vec![];
 
   for entry in directories {
-    if is_env_file(&entry) {
+    if is_real_env_file(&entry) {
       let cloned = entry.clone();
       env_files.push(cloned);
     }
