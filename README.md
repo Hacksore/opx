@@ -55,7 +55,3 @@ Cached:    0 cached, 2 total
 - How do you handle duplicate env vars?
 - How do you handle different environment dimensions (.env.local vs .env.production, etc)
 
-### TODO
-- [ ] Allow a user defined node package manager 
-- [ ] Support for more than just the node ecosystem
-- [x] Allow a custom script to be passed in
