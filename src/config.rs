@@ -30,12 +30,21 @@ impl OpxConfig {
     file.read_to_string(&mut contents)?;
 
     // read the packageManager field to see if it's npm or yarn
-    let package_manager: Value = serde_json::from_str(&contents)?;
-    println!("packageManager: {}", package_manager["packageManager"]);
+    let package_json: Value = serde_json::from_str(&contents)?;
+    let mut package_manager: String = String::from("npm");
+    println!("packageManager: {}", package_json["packageManager"]);
 
-    let instance = OpxConfig {
-      package_manager: String::from("npm"),
-    };
+    if !package_json["packageManager"].is_string() {
+      println!("[OPX] Can't find \"packageManager\" in the \"package.json\" file.");
+    } else {
+      println!("[OPX] Found \"packageManager\" in the \"package.json\" file.");
+      // extrac the package manager from the before the @ symbol
+      let raw_package_manager = package_json["packageManager"].as_str().unwrap();
+      let parts = raw_package_manager.split("@").collect::<Vec<&str>>();
+      package_manager = parts.get(0).unwrap().to_owned()
+    }
+
+    let instance = OpxConfig { package_manager };
 
     // Initialize default values for your properties
     Ok(instance)
