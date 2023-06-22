@@ -67,7 +67,7 @@ pub fn run_op_command(
     let mut absolute_dir = env_file_path.replace(&current_dir_string, "");
     absolute_dir.remove(0);
 
-    println!("[ENV] {}", absolute_dir)
+    println!("[OPX] parsing env file {absolute_dir}");
   });
 
   let op_env_flags: Vec<String> = env_files

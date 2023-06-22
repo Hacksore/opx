@@ -32,16 +32,16 @@ impl OpxConfig {
     // read the packageManager field to see if it's npm or yarn
     let package_json: Value = serde_json::from_str(&contents)?;
     let mut package_manager: String = String::from("npm");
-    println!("packageManager: {}", package_json["packageManager"]);
 
     if !package_json["packageManager"].is_string() {
       println!("[OPX] Can't find \"packageManager\" in the \"package.json\" file.");
     } else {
-      println!("[OPX] Found \"packageManager\" in the \"package.json\" file.");
-      // extrac the package manager from the before the @ symbol
+      // extract the package manager from the before the @ symbol
       let raw_package_manager = package_json["packageManager"].as_str().unwrap();
       let parts = raw_package_manager.split("@").collect::<Vec<&str>>();
-      package_manager = parts.get(0).unwrap().to_owned()
+      package_manager = parts[0].to_string();
+
+      println!("[OPX] using package manager {package_manager}");
     }
 
     let instance = OpxConfig { package_manager };
