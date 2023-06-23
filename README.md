@@ -18,7 +18,6 @@ op run --env-file=.env --env-file=apps/web/.env -- npm start
 Working example of it doing the correct thing in a demo repo:
 ```
 opx ✔ $ opx
-[OPX] Can't find config file "opx.json", using default values
 [OPX] Forcing terminal colors with FORCE_COLOR=1
 [ENV] .env
 [ENV] apps/demo/.env
