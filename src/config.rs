@@ -41,7 +41,7 @@ impl OpxConfig {
       let parts = raw_package_manager.split("@").collect::<Vec<&str>>();
       package_manager = parts[0].to_string();
 
-      println!("[OPX] using package manager {package_manager}");
+      println!("[OPX] Using package manager {package_manager}");
     }
 
     let instance = OpxConfig { package_manager };

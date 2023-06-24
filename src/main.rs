@@ -23,7 +23,7 @@ fn main() -> Result<()> {
     args => args,
   };
 
-  run_op_command(env_files, op_args.into_iter(), package_manager);
+  run_op_command(env_files, op_args, package_manager);
 
   Ok(())
 }

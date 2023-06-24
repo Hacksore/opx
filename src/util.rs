@@ -2,6 +2,8 @@ use std::env;
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
 
+// use crate::display::display_op_command;
+
 const FORCE_COLOR: &str = "FORCE_COLOR";
 
 /// TODO: what do you do about dimensions .env.local vs .env.production
@@ -36,11 +38,7 @@ pub fn is_skip_dir(entry: &DirEntry) -> bool {
 }
 
 /// Run the `op` command with all the `.env` vars files found in the current directory
-pub fn run_op_command(
-  env_files: Vec<DirEntry>,
-  args: impl Iterator<Item = String>,
-  package_manager: &String,
-) {
+pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manager: &String) {
   let current_dir = env::current_dir();
   let mut current_dir_string = String::from("");
   match &current_dir {
@@ -67,13 +65,32 @@ pub fn run_op_command(
     let mut absolute_dir = env_file_path.replace(&current_dir_string, "");
     absolute_dir.remove(0);
 
-    println!("[OPX] parsing env file {absolute_dir}");
   });
 
   let op_env_flags: Vec<String> = env_files
     .iter()
     .map(|s| format!("{}={}", "--env-file", s.path().to_string_lossy()))
     .collect();
+
+  let op_env_flags_display: Vec<String> = op_env_flags
+    .clone()
+    .iter()
+    .map(|s| {
+      // TODO: is this legal?
+      let mut s = s.to_string();
+      if s != op_env_flags.last().unwrap().to_string() {
+        s.push_str(" \\");
+      }
+
+      let mut no_rel_dir = s.replace(&current_dir_string, "");
+      // TODO: im sorry for my sins
+      no_rel_dir.remove(11);
+
+      format!("\t{}", no_rel_dir.trim())
+    })
+    .collect();
+
+  let args_clone = args.clone();
 
   let mut binding = Command::new("op");
   let command = binding
@@ -83,12 +100,15 @@ pub fn run_op_command(
     .arg(package_manager)
     .args(args);
 
-  let command_args: Vec<_> = command.get_args().map(|s| s.to_string_lossy()).collect();
-  println!(
-    "[OPX] {} {}",
-    command.get_program().to_string_lossy(),
-    command_args.join(" ")
+  let flags = op_env_flags_display.join("\n");
+  let fmt_string = format!(
+    "[OPX] op run \\\n{} -- {} {}",
+    flags,
+    package_manager,
+    args_clone.join(" ")
   );
+
+  println!("{fmt_string}");
 
   let mut command_spawn = command.spawn().expect("Failed to execute command");
   let status = command_spawn
