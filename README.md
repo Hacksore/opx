@@ -50,6 +50,17 @@ Cached:    0 cached, 2 total
   Time:    216ms
 ```
 
+# Debug
+How i link it
+
+```
+# dev
+cargo watch -x "build --release"
+
+# link it
+export PATH="$HOME/code/opensource/onepassword-secret-util/target/release:$PATH"
+```
+
 ### Considerations
 - How do you handle duplicate env vars?
 - How do you handle different environment dimensions (.env.local vs .env.production, etc)

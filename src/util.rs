@@ -2,8 +2,6 @@ use std::env;
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
 
-// use crate::display::display_op_command;
-
 const FORCE_COLOR: &str = "FORCE_COLOR";
 
 /// TODO: what do you do about dimensions .env.local vs .env.production

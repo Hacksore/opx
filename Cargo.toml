@@ -11,10 +11,15 @@ repository = "https://github.com/Hacksore/onepassword-secret-util"
 [dependencies]
 anyhow = "1.0.69"
 clap = { version = "4.1.8", features = ["derive"] }
+dirs = "5.0.1"
 serde = { version = "1.0.154", features = ["derive"] }
 serde_json = "1.0.94"
 walkdir = "2.3.2"
 
 [[bin]]
 name = "opx"
+path = "src/main.rs"
+
+[[bin]]
+name = "o"
 path = "src/main.rs"

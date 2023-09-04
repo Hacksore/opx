@@ -15,6 +15,7 @@ pub struct OpxConfig {
 /// The filename for the package.json
 const PACKAGE_JSON_FILE: &str = "package.json";
 
+/// Used to be a config file but now this is just a way to read the package.json
 impl OpxConfig {
   pub fn new() -> Result<Self, Error> {
     let mut package_json_path = env::current_dir().unwrap();
@@ -50,6 +51,7 @@ impl OpxConfig {
     Ok(instance)
   }
 
+  /// Get the package manager from the package.json
   pub fn get_package_manager(&self) -> &String {
     &self.package_manager
   }
