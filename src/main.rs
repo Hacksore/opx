@@ -23,7 +23,6 @@ fn main() -> Result<()> {
   // NOTE: this is expensive
   let env_files = get_env_files();
   let cli_args = env::args().skip(1).collect::<Vec<String>>();
-  // get current directory
 
   // read config from the local director if possible
   let config = OpxConfig::new()?;
