@@ -28,4 +28,4 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           target: "${{ matrix.settings.toolchain }}"
-      - run: cargo build
+      - run: cargo build --release
