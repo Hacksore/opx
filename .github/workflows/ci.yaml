@@ -12,12 +12,20 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        toolchain:
-          - stable
-          - beta
-          - nightly
+        settings:
+          - host: macos-latest
+            toolchain: aarch64-apple-darwin,x86_64-apple-darwin
+          - host: windows-latest
+            toolchain: x86_64-pc-windows-msvc
+          - host: ubuntu-latest
+            toolchain: x86_64-unknown-linux-gnu
+
     steps:
       - uses: actions/checkout@v3
-      - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
-      - run: cargo build --verbose
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: "${{ matrix.settings.toolchain }}"
+      - run: cargo build
