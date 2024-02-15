@@ -19,7 +19,3 @@ walkdir = "2.3.2"
 [[bin]]
 name = "opx"
 path = "src/main.rs"
-
-[[bin]]
-name = "o"
-path = "src/main.rs"
