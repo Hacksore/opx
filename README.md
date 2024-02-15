@@ -1,4 +1,4 @@
-# onepassword-secret-util
+# opx
 
 This tool allows you to use the `opx` binary to start an application with all `.env` files passed to `op run ...`. 
 
