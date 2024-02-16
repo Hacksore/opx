@@ -1,26 +1,26 @@
-import { SITE_TITLE } from "../config"
+import { SITE_TITLE, SITE_DESCRIPTION } from "../config"
 import Badges from "../components/badges.astro"
+import Header from "../components/header.astro"
 
-![opx logo](/logo.png)
-# {SITE_TITLE}
+<Header />
 <Badges />
 
-Install the `opx` CLI utility with cargo.
+Install the `opx` CLI utility with cargo
 ```
 cargo install opx
 ```
 
-Create an `.env` file in your project and reference a secret from 1Password.
+Create an `.env` file in your project and reference a secret from 1Password
 ```shell
 APPLE_ID="op://overlayed/apple_id/credential"
 ```
 
-Run your application to inject the secrets.
+Run your application to inject the secrets
 ```
 opx
 ```
 
-Example running this [demo application](https://github.com/Hacksore/demo-1pass-secrets).
+Example running this [demo application](https://github.com/Hacksore/demo-1pass-secrets)
 
 ```
 $ opx
