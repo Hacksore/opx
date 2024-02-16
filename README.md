@@ -3,7 +3,7 @@
 This tool allows you to use the `opx` binary to start an application with all `.env` files passed to `op run ...`. 
 
 ### Install
-`cargo install onepassword-secret-util`
+`cargo install opx`
 
 ```
 # start your app with secrets injected
@@ -58,7 +58,7 @@ How i link it
 cargo watch -x "build --release"
 
 # link it
-export PATH="$HOME/code/opensource/onepassword-secret-util/target/release:$PATH"
+export PATH="$HOME/code/opensource/opx/target/release:$PATH"
 ```
 
 ### Considerations
