@@ -10,7 +10,7 @@ const integrations = [sitemap(), react(), tailwind(), mdx(), compress()];
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://overlayed.dev",
+  site: "https://tryopx.com",
   trailingSlash: "never",
   integrations,
   server: {

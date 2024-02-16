@@ -1,5 +1,6 @@
 ---
-import Content from "../content/index.md"
+import Content from "../content/index.mdx"
+import CommonHead from "../components/common-head.astro"
 import "../styles/prose.css"
 ---
 
@@ -9,7 +10,7 @@ import "../styles/prose.css"
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
-    <title>opx - Run NodeJS apps with Secrets from 1Password</title>
+    <CommonHead />
   </head>
   <body class="prose mx-auto py-8 px-4">
     <Content />
