@@ -1,5 +1,5 @@
 [package]
-name = "onepassword-secret-util"
+name = "opx"
 description = "Enhance 1password secret expansion with the opx CLI"
 license = "MIT"
 version = "0.0.6"
