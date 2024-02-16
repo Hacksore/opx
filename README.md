@@ -1,47 +1,67 @@
-# Astro Starter Kit: Minimal
+# opx
 
-```sh
-npm create astro@latest -- --template minimal
+This tool allows you to use the `opx` binary to start an application with all `.env` files passed to `op run ...`. 
+
+### Install
+`cargo install opx`
+
+```
+# start your app with secrets injected
+opx
+```
+The command above would run this in the background:
+```
+op run --env-file=.env --env-file=apps/web/.env -- npm start
 ```
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/withastro/astro/tree/latest/examples/minimal)
-[![Open with CodeSandbox](https://assets.codesandbox.io/github/button-edit-lime.svg)](https://codesandbox.io/p/sandbox/github/withastro/astro/tree/latest/examples/minimal)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/withastro/astro?devcontainer_path=.devcontainer/minimal/devcontainer.json)
+### Demo
+Working example of it doing the correct thing in a demo repo:
+```
+opx ✔ $ opx
+[OPX] Forcing terminal colors with FORCE_COLOR=1
+[ENV] .env
+[ENV] apps/demo/.env
+[ENV] apps/other-app/.env
+[OPX] op run --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/.env --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/apps/demo/.env --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/apps/other-app/.env -- npm start
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+> demo-1pass-secrets@0.0.0 start
+> turbo run start
 
-## 🚀 Project Structure
+• Packages in scope: demo, eslint-config-custom, other-app, tsconfig
+• Running start in 4 packages
+• Remote caching disabled
+demo:start: cache bypass, force executing 545833253ebd38cc
+other-app:start: cache bypass, force executing 2ed51133d14970ce
+other-app:start:
+other-app:start: > other-app@1.0.0 start
+other-app:start: > node main.js
+other-app:start:
+demo:start:
+demo:start: > demo@1.0.0 start
+demo:start: > node main.js
+demo:start:
+demo:start: Hello this is a sample app that uses a secret from 1password cli
+other-app:start: Hello this is a sample app that uses a secret from 1password cli
+demo:start: Secret is: <concealed by 1Password>
+other-app:start: Secret is: <concealed by 1Password>
 
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+ Tasks:    2 successful, 2 total
+Cached:    0 cached, 2 total
+  Time:    216ms
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+# Debug
+How i link it
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+```
+# dev
+cargo watch -x "build --release"
 
-Any static assets, like images, can be placed in the `public/` directory.
+# link it
+export PATH="$HOME/code/opensource/opx/target/release:$PATH"
+```
 
-## 🧞 Commands
+### Considerations
+- How do you handle duplicate env vars?
+- How do you handle different environment dimensions (.env.local vs .env.production, etc)
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
