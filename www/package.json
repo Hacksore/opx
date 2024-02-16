@@ -4,7 +4,11 @@
   "version": "0.0.1",
   "scripts": {
     "start": "astro dev",
-    "build": "astro check && astro build",
+    "build": "astro build",
+    "lint": "eslint --ext .astro,.js,.ts 'src/**/*'",
+    "check:format": "prettier --check \"**/*.{astro,ts,js}\"",
+    "clean": "rm -rf dist .turbo node_modules .vercel .astro",
+    "format": "prettier --write \"**/*.{astro,ts,js}\"",
     "preview": "astro preview",
     "astro": "astro"
   },
