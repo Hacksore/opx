@@ -4,6 +4,7 @@
   "description": "A utility for running JS apps with secrets from the 1Password CLI",
   "scripts": {
     "start": "turbo run start",
+    "build": "turbo run build",
     "format": "turbo run format"
   },
   "keywords": [],
