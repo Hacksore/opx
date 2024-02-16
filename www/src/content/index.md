@@ -1,0 +1,40 @@
+# opx - Inject secrets into NodeJS apps with 1Password
+
+Install the `opx` CLI utility with cargo.
+```
+cargo install opx
+```
+
+Create an `.env` file in your project and reference a secret from 1Password.
+```shell
+APPLE_ID="op://overlayed/apple_id/credential"
+```
+
+Run your application to inject the secrets.
+```
+opx
+```
+
+Example running this [demo application](https://github.com/Hacksore/demo-1pass-secrets).
+
+```
+$ opx
+[OPX] Using package manager yarn
+[OPX] Forcing terminal colors with FORCE_COLOR=1
+[OPX] op run \
+        --env-file=apps/demo/.env \
+        --env-file=apps/other-app/.env -- yarn start
+yarn run v1.22.19
+$ turbo run start
+• Packages in scope: demo, eslint-config-custom, other-app, tsconfig
+• Running start in 4 packages
+• Remote caching disabled
+demo:start: cache bypass, force executing 8f7367cf785da609
+other-app:start: cache bypass, force executing cfe557622efbd513
+$ tsx main.ts
+$ tsx main.ts
+demo:start: Hello this is a sample app that uses a secret from 1password cli
+demo:start: Secret is: <concealed by 1Password>
+other-app:start: Hello this is a sample app that uses a secret from 1password cli
+other-app:start: Secret is: <concealed by 1Password>
+```

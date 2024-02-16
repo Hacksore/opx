@@ -1,8 +1,7 @@
 {
   "name": "opx",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A utility for running JS apps with secrets from the 1Password CLI",
   "scripts": {
     "start": "turbo run start",
     "format": "turbo run format"
