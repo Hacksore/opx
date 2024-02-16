@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "turbo run start"
+    "start": "turbo run start",
+    "format": "turbo run format"
   },
   "keywords": [],
   "author": "",
