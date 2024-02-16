@@ -59,7 +59,7 @@ importers:
         specifier: ^0.5.10
         version: 0.5.10(tailwindcss@3.4.1)
       '@vercel/analytics':
-        specifier: ^1.1.1
+        specifier: ^1.1.4
         version: 1.1.4
       astro:
         specifier: ^4.4.0
