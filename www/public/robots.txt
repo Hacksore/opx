@@ -1,0 +1,5 @@
+Allow: /
+Disallow: /auth
+Disallow: /cdn-cgi
+
+Sitemap: https://tryopx.com/sitemap-index.xml
