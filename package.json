@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "A utility for running JS apps with secrets from the 1Password CLI",
   "scripts": {
-    "start": "turbo run start",
+    "start": "turbo start",
     "build": "turbo run build",
+    "check:format": "turbo run check:format",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "lint": "turbo run lint",
     "format": "turbo run format"
   },
   "keywords": [],
