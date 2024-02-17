@@ -6,4 +6,4 @@ This is a CLI meant to enhance the native [1Passwords native CLI (`op`)](https:/
 
 ### Documentation
 
-Mode of this is explaied on [tryopx.com](https://tryopx.com)
+Most of `opx` is explained on [tryopx.com](https://tryopx.com).
