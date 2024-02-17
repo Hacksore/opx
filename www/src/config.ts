@@ -1,4 +1,4 @@
-export const SITE_TITLE = "opx - No Plaintext Secrets at Rest";
+export const SITE_TITLE = "opx | A 1Password companion CLI";
 export const SITE_DESCRIPTION =
-  "Run NodeJS apps with secrets from 1Password CLI";
+  "The most secure way to run NodeJS apps locally!";
 export const SITE_IMAGE = "/og.png";

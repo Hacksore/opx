@@ -5,39 +5,46 @@ import Header from "../components/header.astro"
 <Header />
 <Badges />
 
-Install the `opx` CLI utility with cargo
+### Overview
+This is a CLI meant to enhance native [1Passwords native CLI (`op`)](https://developer.1password.com/docs/cli/get-started/) simplifying the developer experience.
+
+While you can run the following 1Password `op run` CLI there is a bit of manual effort to pass the additional flags where each one of your `.env` files is located.
+
+```
+op run --env-file=.env -- pnpm start
+```
+
+With `opx` it will scan you current working directory for any `.env` files and load them as variadic `--env-file` argument(s).
+
+### Installing
+Ensure you have installed an configured the [1Password CLI](https://developer.1password.com/docs/cli/get-started). Then you can Install the `opx` CLI utility with cargo.
 ```
 cargo install opx
 ```
 
-Create an `.env` file in your project and reference a secret from 1Password
+### Usage
+You need to have at least one `.env` file in any folder of your project and it must [reference a secret from 1Password](https://developer.1password.com/docs/cli/secrets-environment-variables/#use-environment-env-files).
 ```shell
 APPLE_ID="op://overlayed/apple_id/credential"
 ```
 
-Run your application to inject the secrets
+Start your application to inject the secrets as environment variables. 
 ```
 opx
 ```
 
-Example running this [demo application](https://github.com/Hacksore/demo-1pass-secrets)
+It will check [`packageManager`](https://nodejs.org/dist/latest/docs/api/all.html#all_packages_packagemanager) definition and use that start your app. The default package manager is `npm` and the default script is `start`. You can run any script in your applications `package.json` with `opx <args>`.
 
-```
+
+Example running this [demo application](https://github.com/Hacksore/demo-1pass-secrets).
+
+```shell
 $ opx
-[OPX] Using package manager yarn
+[OPX] Using package manager pnpm 
 [OPX] Forcing terminal colors with FORCE_COLOR=1
 [OPX] op run \
         --env-file=apps/demo/.env \
-        --env-file=apps/other-app/.env -- yarn start
-yarn run v1.22.19
-$ turbo run start
-• Packages in scope: demo, eslint-config-custom, other-app, tsconfig
-• Running start in 4 packages
-• Remote caching disabled
-demo:start: cache bypass, force executing 8f7367cf785da609
-other-app:start: cache bypass, force executing cfe557622efbd513
-$ tsx main.ts
-$ tsx main.ts
+        --env-file=apps/other-app/.env -- pnpm start
 demo:start: Hello this is a sample app that uses a secret from 1password cli
 demo:start: Secret is: <concealed by 1Password>
 other-app:start: Hello this is a sample app that uses a secret from 1password cli
