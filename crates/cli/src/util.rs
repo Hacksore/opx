@@ -25,6 +25,7 @@ pub fn is_real_env_file(entry: &DirEntry) -> bool {
 }
 
 /// TODO: Do not hard code this list and maybe add yet another dotfile?
+/// alternatively, maybe just add an opx section to package.json
 pub fn is_skip_dir(entry: &DirEntry) -> bool {
   let binding = entry.file_name();
   let name = binding.to_string_lossy();
