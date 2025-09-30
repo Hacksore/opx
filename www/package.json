@@ -5,10 +5,10 @@
   "scripts": {
     "start": "astro dev",
     "build": "astro build",
-    "lint": "eslint --ext .astro,.js,.ts 'src/**/*'",
-    "check:format": "prettier --check \"**/*.{astro,ts,js}\"",
+    "format": "biome format --write",
+    "lint": "biome lint",
+    "check:format": "biome format",
     "clean": "rm -rf dist .turbo node_modules .vercel .astro",
-    "format": "prettier --write \"**/*.{astro,ts,js}\"",
     "preview": "astro preview",
     "astro": "astro"
   },
@@ -31,11 +31,6 @@
   "devDependencies": {
     "@astrojs/react": "^3.0.8",
     "@types/react": "^18.2.15",
-    "eslint-plugin-astro": "^0.29.1",
-    "lint": "workspace:*",
-    "prettier": "^3.0.3",
-    "prettier-plugin-astro": "^0.12.2",
-    "prettier-plugin-tailwindcss": "^0.5.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sharp": "^0.33.1"

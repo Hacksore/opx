@@ -1,4 +1,5 @@
 /** back tics for codies **/
+/** biome-ignore-all lint/complexity/noImportantStyles: required to override the theme */
 .prose :where(code):not(:where([class~="not-prose"] *))::after {
   content: none !important;
 }
@@ -16,7 +17,7 @@
 }
 
 .prose pre {
-  background: #262525 !important
+  background: #262525 !important;
 }
 
 /* this is a hack to reset it  */
