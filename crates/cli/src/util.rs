@@ -62,7 +62,6 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
     let env_file_path = e.path().display().to_string();
     let mut absolute_dir = env_file_path.replace(&current_dir_string, "");
     absolute_dir.remove(0);
-
   });
 
   let op_env_flags: Vec<String> = env_files
