@@ -24,13 +24,16 @@ pub fn is_real_env_file(entry: &DirEntry) -> bool {
       .unwrap_or(false)
 }
 
-/// TODO: Do not hard code this list and maybe add yet another dotfile?
-/// alternatively, maybe just add an opx section to package.json
-pub fn is_skip_dir(entry: &DirEntry) -> bool {
+/// Check if a directory should be skipped based on the configured ignored directories
+pub fn is_skip_dir(entry: &DirEntry, ignored_directories: &Vec<String>) -> bool {
   let binding = entry.file_name();
   let name = binding.to_string_lossy();
-  if name.contains(".git") || name.contains("node_modules") {
-    return false;
+  
+  // Check if the directory name contains any of the ignored patterns
+  for ignored_dir in ignored_directories {
+    if name.contains(ignored_dir) {
+      return false;
+    }
   }
 
   return true;
@@ -125,13 +128,13 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
 }
 
 /// Get all `DirEntry` for every `.env` file from the current directory
-pub fn get_env_files() -> Vec<DirEntry> {
+pub fn get_env_files(ignored_directories: &Vec<String>) -> Vec<DirEntry> {
   let current_dir = env::current_dir().expect("Failed to get current directory");
 
   // All the dirs with .env files excluding certain skipped folders
   let directories = WalkDir::new(&current_dir)
     .into_iter()
-    .filter_entry(is_skip_dir)
+    .filter_entry(|entry| is_skip_dir(entry, ignored_directories))
     .filter_map(|e| e.ok());
 
   let mut env_files: Vec<DirEntry> = vec![];

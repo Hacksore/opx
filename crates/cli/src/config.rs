@@ -10,6 +10,8 @@ use std::io::prelude::*;
 #[serde(rename_all = "camelCase")]
 pub struct OpxConfig {
   pub package_manager: String,
+  pub ignored_directories: Vec<String>,
+  pub default_start_command: String,
 }
 
 /// The filename for the package.json
@@ -45,7 +47,45 @@ impl OpxConfig {
       println!("[OPX] Using package manager {package_manager}");
     }
 
-    let instance = OpxConfig { package_manager };
+    // Parse opx configuration section
+    let mut ignored_directories = vec![".git".to_string(), "node_modules".to_string()];
+    let mut default_start_command = "start".to_string();
+
+    if let Some(opx_config) = package_json.get("opx") {
+      println!("[OPX] Found opx configuration in package.json");
+      
+      if let Some(ignored_dirs) = opx_config.get("ignoredDirectories") {
+        if let Some(dirs_array) = ignored_dirs.as_array() {
+          ignored_directories = dirs_array
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.to_string())
+            .collect();
+          println!("[OPX] Using custom ignored directories: {:?}", ignored_directories);
+        }
+      } else {
+        println!("[OPX] Using default ignored directories: {:?}", ignored_directories);
+      }
+
+      if let Some(default_cmd) = opx_config.get("defaultStartCommand") {
+        if let Some(cmd_str) = default_cmd.as_str() {
+          default_start_command = cmd_str.to_string();
+          println!("[OPX] Using custom default start command: {}", default_start_command);
+        }
+      } else {
+        println!("[OPX] Using default start command: {}", default_start_command);
+      }
+    } else {
+      println!("[OPX] No opx configuration found, using defaults");
+      println!("[OPX] Using default ignored directories: {:?}", ignored_directories);
+      println!("[OPX] Using default start command: {}", default_start_command);
+    }
+
+    let instance = OpxConfig { 
+      package_manager,
+      ignored_directories,
+      default_start_command,
+    };
 
     // Initialize default values for your properties
     Ok(instance)
@@ -54,5 +94,15 @@ impl OpxConfig {
   /// Get the package manager from the package.json
   pub fn get_package_manager(&self) -> &String {
     &self.package_manager
+  }
+
+  /// Get the ignored directories from the opx config
+  pub fn get_ignored_directories(&self) -> &Vec<String> {
+    &self.ignored_directories
+  }
+
+  /// Get the default start command from the opx config
+  pub fn get_default_start_command(&self) -> &String {
+    &self.default_start_command
   }
 }

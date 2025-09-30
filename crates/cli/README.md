@@ -14,6 +14,26 @@ The command above would run this in the background:
 op run --env-file=.env --env-file=apps/web/.env -- npm start
 ```
 
+### Configuration
+
+You can configure `opx` by adding an `opx` section to your `package.json`:
+
+```json
+{
+  "name": "my-project",
+  "packageManager": "npm@10.0.0",
+  "opx": {
+    "ignoredDirectories": [".git", "node_modules", ".next", "dist", "build"],
+    "defaultStartCommand": "dev"
+  }
+}
+```
+
+#### Configuration Options
+
+- **`ignoredDirectories`** (array of strings): Directories to skip when searching for `.env` files. Defaults to `[".git", "node_modules"]`
+- **`defaultStartCommand`** (string): The default command to run when no arguments are provided to `opx`. Defaults to `"start"`
+
 ### Demo
 Working example of it doing the correct thing in a demo repo:
 ```

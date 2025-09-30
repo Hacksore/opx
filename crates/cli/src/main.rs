@@ -35,15 +35,16 @@ fn main() -> Result<()> {
   }
 
   // NOTE: this is expensive
-  let env_files = get_env_files();
+  let config = OpxConfig::new()?;
+  let ignored_directories = config.get_ignored_directories();
+  let env_files = get_env_files(ignored_directories);
 
   // read config from the local directory if possible
-  let config = OpxConfig::new()?;
   let package_manager = config.get_package_manager();
 
-  // Handle args: if no args provided, default to 'start', otherwise forward all args
+  // Handle args: if no args provided, use configured default command, otherwise forward all args
   let op_args = if cli.args.is_empty() {
-    vec!["start".to_string()]
+    vec![config.get_default_start_command().clone()]
   } else {
     cli.args
   };
