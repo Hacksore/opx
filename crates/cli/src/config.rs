@@ -14,6 +14,13 @@ pub struct OpxConfig {
   pub default_start_command: String,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OpxPackageConfig {
+  pub ignored_directories: Option<Vec<String>>,
+  pub default_start_command: Option<String>,
+}
+
 /// The filename for the package.json
 const PACKAGE_JSON_FILE: &str = "package.json";
 
@@ -51,28 +58,27 @@ impl OpxConfig {
     let mut ignored_directories = vec![".git".to_string(), "node_modules".to_string()];
     let mut default_start_command = "start".to_string();
 
-    if let Some(opx_config) = package_json.get("opx") {
+    if let Some(opx_config_value) = package_json.get("opx") {
       println!("[OPX] Found opx configuration in package.json");
       
-      if let Some(ignored_dirs) = opx_config.get("ignoredDirectories") {
-        if let Some(dirs_array) = ignored_dirs.as_array() {
-          ignored_directories = dirs_array
-            .iter()
-            .filter_map(|v| v.as_str())
-            .map(|s| s.to_string())
-            .collect();
+      // Try to deserialize the opx config using serde
+      if let Ok(opx_config) = serde_json::from_value::<OpxPackageConfig>(opx_config_value.clone()) {
+        if let Some(custom_ignored_dirs) = opx_config.ignored_directories {
+          ignored_directories = custom_ignored_dirs;
           println!("[OPX] Using custom ignored directories: {:?}", ignored_directories);
+        } else {
+          println!("[OPX] Using default ignored directories: {:?}", ignored_directories);
         }
-      } else {
-        println!("[OPX] Using default ignored directories: {:?}", ignored_directories);
-      }
 
-      if let Some(default_cmd) = opx_config.get("defaultStartCommand") {
-        if let Some(cmd_str) = default_cmd.as_str() {
-          default_start_command = cmd_str.to_string();
+        if let Some(custom_default_cmd) = opx_config.default_start_command {
+          default_start_command = custom_default_cmd;
           println!("[OPX] Using custom default start command: {}", default_start_command);
+        } else {
+          println!("[OPX] Using default start command: {}", default_start_command);
         }
       } else {
+        println!("[OPX] Invalid opx configuration format, using defaults");
+        println!("[OPX] Using default ignored directories: {:?}", ignored_directories);
         println!("[OPX] Using default start command: {}", default_start_command);
       }
     } else {
