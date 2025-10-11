@@ -1,6 +1,7 @@
 use std::env;
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
+use log::{info, debug, error};
 
 const FORCE_COLOR: &str = "FORCE_COLOR";
 
@@ -57,16 +58,24 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
 
   // set force color before running the shell command to make libs like chalk output colors
   if !force_color {
-    println!("[OPX] Forcing terminal colors with {}=1", FORCE_COLOR);
+    debug!("Forcing terminal colors with {}=1", FORCE_COLOR);
     unsafe { env::set_var(FORCE_COLOR, "1") };
   }
 
-  // print out a list of all the ENV files sourced
-  env_files.iter().for_each(|e| {
-    let env_file_path = e.path().display().to_string();
-    let mut absolute_dir = env_file_path.replace(&current_dir_string, "");
-    absolute_dir.remove(0);
-  });
+  // Log all the ENV files that will be sourced
+  if env_files.is_empty() {
+    debug!("No .env files found in current directory");
+  } else {
+    debug!("Found {} .env file(s):", env_files.len());
+    env_files.iter().for_each(|e| {
+      let env_file_path = e.path().display().to_string();
+      let mut relative_path = env_file_path.replace(&current_dir_string, "");
+      if !relative_path.is_empty() {
+        relative_path.remove(0); // Remove leading slash
+      }
+      debug!("  - {}", relative_path);
+    });
+  }
 
   let op_env_flags: Vec<String> = env_files
     .iter()
@@ -103,13 +112,14 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
 
   let flags = op_env_flags_display.join("\n");
   let fmt_string = format!(
-    "[OPX] op run \\\n{} -- {} {}",
+    "op run \\\n{} -- {} {}",
     flags,
     package_manager,
     args_clone.join(" ")
   );
 
-  println!("{fmt_string}");
+  info!("{fmt_string}");
+  debug!("Executing op command with {} env file(s)", env_files.len());
 
   let mut command_spawn = command.spawn().expect("Failed to execute command");
   let status = command_spawn
@@ -123,7 +133,7 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
   }
 
   if !status.success() {
-    eprintln!("Command failed: {}", status);
+    error!("Command failed: {}", status);
   }
 }
 
