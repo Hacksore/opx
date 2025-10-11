@@ -26,7 +26,7 @@ struct Cli {
 fn main() -> Result<()> {
   let cli = Cli::parse();
 
-  let current_dir = env::current_dir().unwrap();
+  let current_dir = env::current_dir().expect("Failed to get current directory");
 
   // if they are in their home dir then tell them to go to a project
   if current_dir == home_dir().unwrap() {
