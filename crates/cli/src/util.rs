@@ -58,7 +58,7 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
   // set force color before running the shell command to make libs like chalk output colors
   if !force_color {
     println!("[OPX] Forcing terminal colors with {}=1", FORCE_COLOR);
-    env::set_var(FORCE_COLOR, "1");
+    unsafe { env::set_var(FORCE_COLOR, "1") };
   }
 
   // print out a list of all the ENV files sourced
@@ -117,9 +117,9 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
     .expect("Failed to wait for child process");
 
   if force_color {
-    env::remove_var(FORCE_COLOR)
+    unsafe { env::remove_var(FORCE_COLOR) }
   } else {
-    env::set_var(FORCE_COLOR, "1");
+    unsafe { env::set_var(FORCE_COLOR, "1") };
   }
 
   if !status.success() {
