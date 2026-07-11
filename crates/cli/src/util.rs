@@ -96,7 +96,7 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
       // TODO: im sorry for my sins
       no_rel_dir.remove(11);
 
-      format!("\t{}", no_rel_dir.trim())
+      format!("  {}", no_rel_dir.trim())
     })
     .collect();
 
@@ -118,7 +118,7 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
     args_clone.join(" ")
   );
 
-  info!("{fmt_string}");
+  info!("Running op cli\n{fmt_string}\n");
   debug!("Executing op command with {} env file(s)", env_files.len());
 
   let mut command_spawn = command.spawn().expect("Failed to execute command");

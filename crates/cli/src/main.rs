@@ -41,15 +41,12 @@ fn main() -> Result<()> {
         buf,
         "{}[opx]{} {}",
         level_color,
-        record.level(),
         reset_color,
         record.args()
       )
     })
     .filter_level(log::LevelFilter::Info)
     .init();
-
-  info!("Running op cli 🚀");
 
   let cli = Cli::parse();
 

@@ -38,11 +38,11 @@ You can configure `opx` by adding an `opx` section to your `package.json`:
 Working example of it doing the correct thing in a demo repo:
 ```
 opx ✔ $ opx
-[OPX] Forcing terminal colors with FORCE_COLOR=1
+Forcing terminal colors with FORCE_COLOR=1
 [ENV] .env
 [ENV] apps/demo/.env
 [ENV] apps/other-app/.env
-[OPX] op run --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/.env --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/apps/demo/.env --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/apps/other-app/.env -- npm start
+op run --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/.env --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/apps/demo/.env --env-file=/Users/hacksore/Code/opensource/demo-1pass-secrets/apps/other-app/.env -- npm start
 
 > demo-1pass-secrets@0.0.0 start
 > turbo run start

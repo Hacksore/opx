@@ -1,4 +1,5 @@
 use anyhow::{Error, Result};
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -32,7 +33,7 @@ impl OpxConfig {
     package_json_path.push(PACKAGE_JSON_FILE);
 
     if !package_json_path.exists() {
-      println!("[OPX] Can't find \"package.json\" in the current directory.")
+      error!("Can't find \"package.json\" in the current directory.")
     }
 
     let mut file = File::open(package_json_path)?;
@@ -44,14 +45,14 @@ impl OpxConfig {
     let mut package_manager: String = String::from("npm");
 
     if !package_json["packageManager"].is_string() {
-      println!("[OPX] Can't find \"packageManager\" in the \"package.json\" file.");
+      error!("Can't find \"packageManager\" in the \"package.json\" file.");
     } else {
       // extract the package manager from the before the @ symbol
       let raw_package_manager = package_json["packageManager"].as_str().unwrap();
       let parts = raw_package_manager.split("@").collect::<Vec<&str>>();
       package_manager = parts[0].to_string();
 
-      println!("[OPX] Using package manager {package_manager}");
+      debug!("Using package manager {package_manager}");
     }
 
     // Parse opx configuration section
@@ -59,32 +60,32 @@ impl OpxConfig {
     let mut default_start_command = "start".to_string();
 
     if let Some(opx_config_value) = package_json.get("opx") {
-      println!("[OPX] Found opx configuration in package.json");
+      debug!("Found opx configuration in package.json");
       
       // Try to deserialize the opx config using serde
       if let Ok(opx_config) = serde_json::from_value::<OpxPackageConfig>(opx_config_value.clone()) {
         if let Some(custom_ignored_dirs) = opx_config.ignored_directories {
           ignored_directories = custom_ignored_dirs;
-          println!("[OPX] Using custom ignored directories: {:?}", ignored_directories);
+          debug!("Using custom ignored directories: {:?}", ignored_directories);
         } else {
-          println!("[OPX] Using default ignored directories: {:?}", ignored_directories);
+          debug!("Using default ignored directories: {:?}", ignored_directories);
         }
 
         if let Some(custom_default_cmd) = opx_config.default_start_command {
           default_start_command = custom_default_cmd;
-          println!("[OPX] Using custom default start command: {}", default_start_command);
+          debug!("Using custom default start command: {}", default_start_command);
         } else {
-          println!("[OPX] Using default start command: {}", default_start_command);
+          debug!("Using default start command: {}", default_start_command);
         }
       } else {
-        println!("[OPX] Invalid opx configuration format, using defaults");
-        println!("[OPX] Using default ignored directories: {:?}", ignored_directories);
-        println!("[OPX] Using default start command: {}", default_start_command);
+        debug!("Invalid opx configuration format, using defaults");
+        debug!("Using default ignored directories: {:?}", ignored_directories);
+        debug!("Using default start command: {}", default_start_command);
       }
     } else {
-      println!("[OPX] No opx configuration found, using defaults");
-      println!("[OPX] Using default ignored directories: {:?}", ignored_directories);
-      println!("[OPX] Using default start command: {}", default_start_command);
+      debug!("No opx configuration found, using defaults");
+      debug!("Using default ignored directories: {:?}", ignored_directories);
+      debug!("Using default start command: {}", default_start_command);
     }
 
     let instance = OpxConfig { 
