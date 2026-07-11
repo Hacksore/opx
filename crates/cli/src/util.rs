@@ -1,12 +1,23 @@
 use anyhow::{bail, Context, Result};
+use std::cmp::Ordering;
 use std::env;
 use std::ffi::OsString;
 use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tracing::{debug, info, warn};
 use walkdir::{DirEntry, WalkDir};
 
 const FORCE_COLOR: &str = "FORCE_COLOR";
+const PROD_ENV: &str = "prod";
+const DEV_ENV: &str = "dev";
+const STAGING_ENV: &str = "staging";
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParsedCliArgs {
+  pub selected_env: Option<String>,
+  pub command_args: Vec<String>,
+}
 
 fn restore_force_color(original_force_color: Option<OsString>) {
   match original_force_color {
@@ -15,20 +26,166 @@ fn restore_force_color(original_force_color: Option<OsString>) {
   }
 }
 
-/// TODO: what do you do about dimensions .env.local vs .env.production
-/// naive thought is you need a flag on the CLI for --env <env>
-fn is_valid_env_file(name: &str) -> bool {
-  name == ".env"
+fn shorthand_env_arg(arg: &str) -> Option<&'static str> {
+  match arg {
+    "--prod" => Some(PROD_ENV),
+    "--dev" => Some(DEV_ENV),
+    "--staging" => Some(STAGING_ENV),
+    _ => None,
+  }
+}
+
+fn validate_environment_name(environment: &str) -> Result<()> {
+  if environment.is_empty() {
+    bail!(
+      "Missing environment name.\n\nhint: Use --env <env>, for example `opx --env prod db:push`."
+    );
+  }
+
+  if !environment
+    .chars()
+    .all(|character| character.is_ascii_alphanumeric() || character == '-' || character == '_')
+  {
+    bail!(
+      "Invalid environment name `{}`.\n\nwhy: opx maps environments to file names like .env.<env>.\nhint: Use only letters, numbers, hyphens, and underscores.",
+      environment
+    );
+  }
+
+  Ok(())
+}
+
+fn select_environment(selected_env: &mut Option<String>, environment: &str) -> Result<()> {
+  validate_environment_name(environment)?;
+
+  if let Some(existing_environment) = selected_env {
+    bail!(
+      "Multiple environments were selected.\n\nselected: {}, {}\nhint: Choose one environment with --env <env> or one shorthand like --prod.",
+      existing_environment,
+      environment
+    );
+  }
+
+  *selected_env = Some(environment.to_string());
+
+  Ok(())
+}
+
+pub fn parse_cli_args(args: Vec<String>) -> Result<ParsedCliArgs> {
+  let mut selected_env: Option<String> = None;
+  let mut command_args: Vec<String> = vec![];
+  let mut index = 0;
+
+  while index < args.len() {
+    let arg = &args[index];
+
+    if arg == "--" {
+      command_args.extend(args.iter().skip(index + 1).cloned());
+      break;
+    }
+
+    if arg == "--env" {
+      let environment = args.get(index + 1).ok_or_else(|| {
+        anyhow::anyhow!(
+          "Missing environment after --env.\n\nhint: Use --env <env>, for example `opx --env prod db:push`."
+        )
+      })?;
+
+      if environment == "--" {
+        bail!(
+          "Missing environment after --env.\n\nhint: Put the environment before --, for example `opx --env prod -- db:push --prod`."
+        );
+      }
+
+      select_environment(&mut selected_env, environment)?;
+      index += 2;
+      continue;
+    }
+
+    if let Some(environment) = arg.strip_prefix("--env=") {
+      select_environment(&mut selected_env, environment)?;
+      index += 1;
+      continue;
+    }
+
+    if let Some(environment) = shorthand_env_arg(arg) {
+      select_environment(&mut selected_env, environment)?;
+      index += 1;
+      continue;
+    }
+
+    command_args.push(arg.clone());
+    index += 1;
+  }
+
+  Ok(ParsedCliArgs {
+    selected_env,
+    command_args,
+  })
+}
+
+fn is_valid_env_file(name: &str, selected_env: Option<&str>) -> bool {
+  if name == ".env" {
+    return true;
+  }
+
+  match selected_env {
+    Some(environment) => name == format!(".env.{environment}"),
+    None => false,
+  }
 }
 
 /// Test if a given dir entry is an .env file
-pub fn is_real_env_file(entry: &DirEntry) -> bool {
+pub fn is_real_env_file(entry: &DirEntry, selected_env: Option<&str>) -> bool {
   entry.file_type().is_file()
     && entry
       .file_name()
       .to_str()
-      .map(is_valid_env_file)
+      .map(|name| is_valid_env_file(name, selected_env))
       .unwrap_or(false)
+}
+
+fn env_file_group(path: &Path, selected_env: Option<&str>) -> usize {
+  match path.file_name().and_then(|name| name.to_str()) {
+    Some(".env") => 0,
+    Some(name) if selected_env.is_some_and(|environment| name == format!(".env.{environment}")) => {
+      1
+    }
+    _ => 2,
+  }
+}
+
+fn relative_path(path: &Path, current_dir: &Path) -> PathBuf {
+  path
+    .strip_prefix(current_dir)
+    .map_or_else(|_| path.to_path_buf(), Path::to_path_buf)
+}
+
+fn env_file_sort_key(
+  path: &Path,
+  current_dir: &Path,
+  selected_env: Option<&str>,
+) -> (usize, usize, PathBuf) {
+  let relative_path = relative_path(path, current_dir);
+
+  (
+    env_file_group(&relative_path, selected_env),
+    relative_path.components().count(),
+    relative_path,
+  )
+}
+
+fn compare_env_files(
+  left: &DirEntry,
+  right: &DirEntry,
+  current_dir: &Path,
+  selected_env: Option<&str>,
+) -> Ordering {
+  env_file_sort_key(left.path(), current_dir, selected_env).cmp(&env_file_sort_key(
+    right.path(),
+    current_dir,
+    selected_env,
+  ))
 }
 
 /// TODO: Do not hard code this list and maybe add yet another dotfile?
@@ -43,6 +200,7 @@ pub fn run_op_command(
   env_files: Vec<DirEntry>,
   args: Vec<String>,
   package_manager: &str,
+  selected_env: Option<&str>,
 ) -> Result<()> {
   let current_dir = env::current_dir().context(
     "Failed to determine the current working directory.\n\nhint: Run opx from a project directory that still exists on disk.",
@@ -116,6 +274,7 @@ pub fn run_op_command(
 
   info!(
     command = %command_display,
+    environment = selected_env.unwrap_or("default"),
     env_file_count = env_file_paths.len(),
     "Running command through 1Password"
   );
@@ -171,7 +330,7 @@ pub fn run_op_command(
 }
 
 /// Get all `DirEntry` for every `.env` file from the current directory
-pub fn get_env_files() -> Result<Vec<DirEntry>> {
+pub fn get_env_files(selected_env: Option<&str>) -> Result<Vec<DirEntry>> {
   let current_dir = env::current_dir().context(
     "Failed to determine the current working directory while scanning for .env files.\n\nhint: Run opx from a project directory that still exists on disk.",
   )?;
@@ -185,11 +344,127 @@ pub fn get_env_files() -> Result<Vec<DirEntry>> {
   let mut env_files: Vec<DirEntry> = vec![];
 
   for entry in directories {
-    if is_real_env_file(&entry) {
+    if is_real_env_file(&entry, selected_env) {
       let cloned = entry.clone();
       env_files.push(cloned);
     }
   }
 
+  env_files.sort_by(|left, right| compare_env_files(left, right, &current_dir, selected_env));
+
   Ok(env_files)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{env_file_sort_key, is_valid_env_file, parse_cli_args, ParsedCliArgs};
+  use std::path::PathBuf;
+
+  fn args(args: &[&str]) -> Vec<String> {
+    args.iter().map(|arg| arg.to_string()).collect()
+  }
+
+  #[test]
+  fn parses_prod_shorthand_before_command() {
+    let parsed = parse_cli_args(args(&["--prod", "db:push"])).unwrap();
+
+    assert_eq!(
+      parsed,
+      ParsedCliArgs {
+        selected_env: Some("prod".to_string()),
+        command_args: args(&["db:push"]),
+      }
+    );
+  }
+
+  #[test]
+  fn parses_env_after_command() {
+    let parsed = parse_cli_args(args(&["db:push", "--env", "staging"])).unwrap();
+
+    assert_eq!(
+      parsed,
+      ParsedCliArgs {
+        selected_env: Some("staging".to_string()),
+        command_args: args(&["db:push"]),
+      }
+    );
+  }
+
+  #[test]
+  fn parses_equals_env_before_command() {
+    let parsed = parse_cli_args(args(&["--env=dev", "dev"])).unwrap();
+
+    assert_eq!(
+      parsed,
+      ParsedCliArgs {
+        selected_env: Some("dev".to_string()),
+        command_args: args(&["dev"]),
+      }
+    );
+  }
+
+  #[test]
+  fn preserves_args_after_separator() {
+    let parsed = parse_cli_args(args(&["--env", "prod", "--", "db:push", "--prod"])).unwrap();
+
+    assert_eq!(
+      parsed,
+      ParsedCliArgs {
+        selected_env: Some("prod".to_string()),
+        command_args: args(&["db:push", "--prod"]),
+      }
+    );
+  }
+
+  #[test]
+  fn rejects_multiple_environment_selectors() {
+    let error = parse_cli_args(args(&["--prod", "--dev"])).unwrap_err();
+
+    assert!(error.to_string().contains("Multiple environments"));
+  }
+
+  #[test]
+  fn rejects_missing_env_value() {
+    let error = parse_cli_args(args(&["--env"])).unwrap_err();
+
+    assert!(error.to_string().contains("Missing environment"));
+  }
+
+  #[test]
+  fn default_env_selection_only_includes_dot_env() {
+    assert!(is_valid_env_file(".env", None));
+    assert!(!is_valid_env_file(".env.prod", None));
+    assert!(!is_valid_env_file(".env.staging", None));
+  }
+
+  #[test]
+  fn selected_env_includes_baseline_and_matching_stage() {
+    assert!(is_valid_env_file(".env", Some("prod")));
+    assert!(is_valid_env_file(".env.prod", Some("prod")));
+    assert!(!is_valid_env_file(".env.dev", Some("prod")));
+    assert!(!is_valid_env_file(".env.production", Some("prod")));
+  }
+
+  #[test]
+  fn env_files_sort_baseline_before_selected_stage() {
+    let root = PathBuf::from("/repo");
+    let mut paths = vec![
+      PathBuf::from("/repo/apps/web/.env.prod"),
+      PathBuf::from("/repo/.env.prod"),
+      PathBuf::from("/repo/apps/web/.env"),
+      PathBuf::from("/repo/.env"),
+    ];
+
+    paths.sort_by_key(|path| env_file_sort_key(path, &root, Some("prod")));
+
+    assert_eq!(
+      paths,
+      vec![
+        PathBuf::from("/repo/.env"),
+        PathBuf::from("/repo/apps/web/.env"),
+        PathBuf::from("/repo/.env.prod"),
+        PathBuf::from("/repo/apps/web/.env.prod"),
+      ]
+    );
+  }
 }

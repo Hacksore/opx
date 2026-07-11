@@ -1,6 +1,6 @@
 # opx
 
-This tool allows you to use the `opx` binary to start an application with all `.env` files passed to `op run ...`. 
+This tool allows you to use the `opx` binary to start an application with project `.env` files passed to `op run ...`.
 
 ### Install
 `cargo install opx`
@@ -12,6 +12,34 @@ opx
 The command above would run this in the background:
 ```
 op run --env-file=.env --env-file=apps/web/.env -- npm start
+```
+
+### Environments
+
+By default, `opx` only loads files named `.env`.
+
+```sh
+opx db:push
+```
+
+To load a stage-specific overlay, pass `--env <stage>`:
+
+```sh
+opx --env prod db:push
+```
+
+The command above loads `.env` and `.env.prod` files. The shorthand flags `--prod`, `--dev`, and `--staging` are also supported:
+
+```sh
+opx --prod db:push
+opx --dev dev
+opx --staging start
+```
+
+If the command you are running needs its own `--prod` flag, put command args after `--`:
+
+```sh
+opx --env prod -- db:push --prod
 ```
 
 ### Demo
@@ -63,5 +91,4 @@ export PATH="$HOME/code/opx/crates/cli/target/release:$PATH"
 
 ### Considerations
 - How do you handle duplicate env vars?
-- How do you handle different environment dimensions (.env.local vs .env.production, etc)
-
+- Should `.env.production` alias `.env.prod`?

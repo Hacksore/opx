@@ -3,7 +3,7 @@
 mod config;
 mod util;
 
-use crate::util::{get_env_files, run_op_command};
+use crate::util::{get_env_files, parse_cli_args, run_op_command};
 use anyhow::{Context, Result};
 use config::OpxConfig;
 use dirs::home_dir;
@@ -62,21 +62,28 @@ fn run() -> Result<()> {
     return Ok(());
   }
 
-  // NOTE: this is expensive
-  let env_files = get_env_files()?;
   let cli_args = env::args().skip(1).collect::<Vec<String>>();
+  let parsed_args = parse_cli_args(cli_args)?;
+
+  // NOTE: this is expensive
+  let env_files = get_env_files(parsed_args.selected_env.as_deref())?;
 
   // read config from the local director if possible
   let config = OpxConfig::new()?;
   let package_manager = config.get_package_manager();
 
   // TODO: default command for now is start but this should be configurable
-  let op_args = match cli_args {
+  let op_args = match parsed_args.command_args {
     args if args.is_empty() => vec!["start".to_string()],
     args => args,
   };
 
-  run_op_command(env_files, op_args, package_manager)?;
+  run_op_command(
+    env_files,
+    op_args,
+    package_manager,
+    parsed_args.selected_env.as_deref(),
+  )?;
 
   Ok(())
 }
