@@ -1,3 +1,4 @@
+use anyhow::{bail, Context, Result};
 use std::env;
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
@@ -7,11 +8,7 @@ const FORCE_COLOR: &str = "FORCE_COLOR";
 /// TODO: what do you do about dimensions .env.local vs .env.production
 /// naive thought is you need a flag on the CLI for --env <env>
 fn is_valid_env_file(name: &str) -> bool {
-  if name == ".env" {
-    return true;
-  }
-
-  return false;
+  name == ".env"
 }
 
 /// Test if a given dir entry is an .env file
@@ -28,26 +25,18 @@ pub fn is_real_env_file(entry: &DirEntry) -> bool {
 pub fn is_skip_dir(entry: &DirEntry) -> bool {
   let binding = entry.file_name();
   let name = binding.to_string_lossy();
-  if name.contains(".git") || name.contains("node_modules") {
-    return false;
-  }
-
-  return true;
+  !name.contains(".git") && !name.contains("node_modules")
 }
 
 /// Run the `op` command with all the `.env` vars files found in the current directory
-pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manager: &String) {
-  let current_dir = env::current_dir();
-  let mut current_dir_string = String::from("");
-  match &current_dir {
-    Ok(dir) => {
-      current_dir_string = dir.to_string_lossy().to_string();
-    }
-    Err(_) => {
-      // do nothing
-    }
-  }
+pub fn run_op_command(
+  env_files: Vec<DirEntry>,
+  args: Vec<String>,
+  package_manager: &str,
+) -> Result<()> {
+  let current_dir = env::current_dir().context("Failed to get current directory")?;
 
+  let original_force_color = env::var_os(FORCE_COLOR);
   let force_color_str = env::var(FORCE_COLOR).unwrap_or_default();
   let force_color: bool = force_color_str.parse().unwrap_or(false);
 
@@ -58,12 +47,10 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
   }
 
   // print out a list of all the ENV files sourced
-  env_files.iter().for_each(|e| {
-    let env_file_path = e.path().display().to_string();
-    let mut absolute_dir = env_file_path.replace(&current_dir_string, "");
-    absolute_dir.remove(0);
-
-  });
+  env_files
+    .iter()
+    .filter_map(|e| e.path().strip_prefix(&current_dir).ok())
+    .for_each(|path| println!("[ENV] {}", path.display()));
 
   let op_env_flags: Vec<String> = env_files
     .iter()
@@ -73,18 +60,17 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
   let op_env_flags_display: Vec<String> = op_env_flags
     .clone()
     .iter()
-    .map(|s| {
-      // TODO: is this legal?
-      let mut s = s.to_string();
-      if s != op_env_flags.last().unwrap().to_string() {
-        s.push_str(" \\");
+    .enumerate()
+    .map(|(index, flag)| {
+      let mut display_flag = flag.clone();
+      if index + 1 != op_env_flags.len() {
+        display_flag.push_str(" \\");
       }
 
-      let mut no_rel_dir = s.replace(&current_dir_string, "");
-      // TODO: im sorry for my sins
-      no_rel_dir.remove(11);
-
-      format!("\t{}", no_rel_dir.trim())
+      format!(
+        "\t{}",
+        display_flag.replace(&current_dir.to_string_lossy().to_string(), "")
+      )
     })
     .collect();
 
@@ -108,20 +94,21 @@ pub fn run_op_command(env_files: Vec<DirEntry>, args: Vec<String>, package_manag
 
   println!("{fmt_string}");
 
-  let mut command_spawn = command.spawn().expect("Failed to execute command");
+  let mut command_spawn = command.spawn().context("Failed to execute command")?;
   let status = command_spawn
     .wait()
-    .expect("Failed to wait for child process");
+    .context("Failed to wait for child process")?;
 
-  if force_color {
-    env::remove_var(FORCE_COLOR)
-  } else {
-    env::set_var(FORCE_COLOR, "1");
+  match original_force_color {
+    Some(value) => env::set_var(FORCE_COLOR, value),
+    None => env::remove_var(FORCE_COLOR),
   }
 
   if !status.success() {
-    eprintln!("Command failed: {}", status);
+    bail!("Command failed: {}", status);
   }
+
+  Ok(())
 }
 
 /// Get all `DirEntry` for every `.env` file from the current directory
@@ -143,5 +130,5 @@ pub fn get_env_files() -> Vec<DirEntry> {
     }
   }
 
-  return env_files;
+  env_files
 }

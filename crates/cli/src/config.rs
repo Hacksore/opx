@@ -1,13 +1,9 @@
-use anyhow::{Error, Result};
-use serde::{Deserialize, Serialize};
+use anyhow::{Context, Result};
 use serde_json::Value;
-
 use std::env;
-use std::fs::File;
-use std::io::prelude::*;
+use std::fs;
 
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct OpxConfig {
   pub package_manager: String,
 }
@@ -17,8 +13,8 @@ const PACKAGE_JSON_FILE: &str = "package.json";
 
 /// Used to be a config file but now this is just a way to read the package.json
 impl OpxConfig {
-  pub fn new() -> Result<Self, Error> {
-    let mut package_json_path = env::current_dir().unwrap();
+  pub fn new() -> Result<Self> {
+    let mut package_json_path = env::current_dir().context("Failed to get current directory")?;
     // add the file config name
     package_json_path.push(PACKAGE_JSON_FILE);
 
@@ -26,23 +22,23 @@ impl OpxConfig {
       println!("[OPX] Can't find \"package.json\" in the current directory.")
     }
 
-    let mut file = File::open(package_json_path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
+    let contents = fs::read_to_string(&package_json_path)
+      .with_context(|| format!("Failed to read {}", package_json_path.display()))?;
 
     // read the packageManager field to see if it's npm or yarn
-    let package_json: Value = serde_json::from_str(&contents)?;
+    let package_json: Value = serde_json::from_str(&contents)
+      .with_context(|| format!("Failed to parse {}", package_json_path.display()))?;
     let mut package_manager: String = String::from("npm");
 
-    if !package_json["packageManager"].is_string() {
-      println!("[OPX] Can't find \"packageManager\" in the \"package.json\" file.");
-    } else {
-      // extract the package manager from the before the @ symbol
-      let raw_package_manager = package_json["packageManager"].as_str().unwrap();
-      let parts = raw_package_manager.split("@").collect::<Vec<&str>>();
-      package_manager = parts[0].to_string();
+    if let Some(raw_package_manager) = package_json["packageManager"].as_str() {
+      package_manager = raw_package_manager
+        .split_once('@')
+        .map_or(raw_package_manager, |(manager, _)| manager)
+        .to_string();
 
       println!("[OPX] Using package manager {package_manager}");
+    } else {
+      println!("[OPX] Can't find \"packageManager\" in the \"package.json\" file.");
     }
 
     let instance = OpxConfig { package_manager };
@@ -52,7 +48,7 @@ impl OpxConfig {
   }
 
   /// Get the package manager from the package.json
-  pub fn get_package_manager(&self) -> &String {
+  pub fn get_package_manager(&self) -> &str {
     &self.package_manager
   }
 }
