@@ -3,6 +3,7 @@ use std::env;
 use std::ffi::OsString;
 use std::io::ErrorKind;
 use std::process::Command;
+use tracing::{debug, info, warn};
 use walkdir::{DirEntry, WalkDir};
 
 const FORCE_COLOR: &str = "FORCE_COLOR";
@@ -53,20 +54,22 @@ pub fn run_op_command(
 
   // set force color before running the shell command to make libs like chalk output colors
   if !force_color {
-    println!("[OPX] Forcing terminal colors with {}=1", FORCE_COLOR);
+    debug!(env_var = FORCE_COLOR, value = 1, "Forcing terminal colors");
     env::set_var(FORCE_COLOR, "1");
   }
 
-  // print out a list of all the ENV files sourced
-  env_files
+  let env_file_paths = env_files
     .iter()
     .filter_map(|e| e.path().strip_prefix(&current_dir).ok())
-    .for_each(|path| println!("[ENV] {}", path.display()));
+    .map(|path| path.display().to_string())
+    .collect::<Vec<String>>();
+
+  debug!(env_files = ?env_file_paths, "Resolved env files");
 
   if env_files.is_empty() {
-    println!("[OPX] No .env files found under {}.", current_dir.display());
-    println!(
-      "[OPX] hint: Add a .env file with 1Password references, for example FOO=\"op://vault/item/field\"."
+    warn!(
+      directory = %current_dir.display(),
+      "No .env files found.\n\nhint: Add a .env file with 1Password references, for example FOO=\"op://vault/item/field\"."
     );
   }
 
@@ -75,24 +78,21 @@ pub fn run_op_command(
     .map(|s| format!("{}={}", "--env-file", s.path().to_string_lossy()))
     .collect();
 
-  let op_env_flags_display: Vec<String> = op_env_flags
-    .clone()
+  let op_env_flags_display: Vec<String> = env_file_paths
     .iter()
     .enumerate()
-    .map(|(index, flag)| {
-      let mut display_flag = flag.clone();
-      if index + 1 != op_env_flags.len() {
+    .map(|(index, path)| {
+      let mut display_flag = format!("--env-file={path}");
+      if index + 1 != env_file_paths.len() {
         display_flag.push_str(" \\");
       }
 
-      format!(
-        "\t{}",
-        display_flag.replace(&current_dir.to_string_lossy().to_string(), "")
-      )
+      format!("\t{display_flag}")
     })
     .collect();
 
   let args_clone = args.clone();
+  let command_display = format!("{} {}", package_manager, args_clone.join(" "));
 
   let mut binding = Command::new("op");
   let command = binding
@@ -103,14 +103,23 @@ pub fn run_op_command(
     .args(args);
 
   let flags = op_env_flags_display.join("\n");
-  let fmt_string = format!(
-    "[OPX] op run \\\n{} -- {} {}",
-    flags,
-    package_manager,
-    args_clone.join(" ")
-  );
+  let fmt_string = if flags.is_empty() {
+    format!("op run -- {} {}", package_manager, args_clone.join(" "))
+  } else {
+    format!(
+      "op run \\\n{} -- {} {}",
+      flags,
+      package_manager,
+      args_clone.join(" ")
+    )
+  };
 
-  println!("{fmt_string}");
+  info!(
+    command = %command_display,
+    env_file_count = env_file_paths.len(),
+    "Running command through 1Password"
+  );
+  debug!("{fmt_string}");
 
   let mut command_spawn = match command.spawn() {
     Ok(child) => child,

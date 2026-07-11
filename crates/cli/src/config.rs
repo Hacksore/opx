@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::env;
 use std::fs;
+use tracing::{debug, warn};
 
 #[derive(Debug)]
 pub struct OpxConfig {
@@ -51,13 +52,13 @@ impl OpxConfig {
         .map_or(raw_package_manager, |(manager, _)| manager)
         .to_string();
 
-      println!("[OPX] Using package manager {package_manager}");
+      debug!(package_manager, "Resolved package manager");
     } else {
-      println!(
-        "[OPX] packageManager not found in {}. Defaulting to npm.",
-        package_json_path.display()
+      warn!(
+        package_json = %package_json_path.display(),
+        package_manager,
+        "packageManager not found in package.json; defaulting to npm.\n\nhint: Add packageManager to package.json to make this explicit."
       );
-      println!("[OPX] hint: Add packageManager to package.json to make this explicit.");
     }
 
     let instance = OpxConfig { package_manager };
