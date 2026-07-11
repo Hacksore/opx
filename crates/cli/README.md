@@ -58,7 +58,7 @@ How i link it
 cargo watch -x "build --release"
 
 # link it
-export PATH="$HOME/code/opensource/opx/target/release:$PATH"
+export PATH="$HOME/code/opx/crates/cli/target/release:$PATH"
 ```
 
 ### Considerations
