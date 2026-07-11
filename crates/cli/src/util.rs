@@ -1,9 +1,18 @@
 use anyhow::{bail, Context, Result};
 use std::env;
+use std::ffi::OsString;
+use std::io::ErrorKind;
 use std::process::Command;
 use walkdir::{DirEntry, WalkDir};
 
 const FORCE_COLOR: &str = "FORCE_COLOR";
+
+fn restore_force_color(original_force_color: Option<OsString>) {
+  match original_force_color {
+    Some(value) => env::set_var(FORCE_COLOR, value),
+    None => env::remove_var(FORCE_COLOR),
+  }
+}
 
 /// TODO: what do you do about dimensions .env.local vs .env.production
 /// naive thought is you need a flag on the CLI for --env <env>
@@ -34,7 +43,9 @@ pub fn run_op_command(
   args: Vec<String>,
   package_manager: &str,
 ) -> Result<()> {
-  let current_dir = env::current_dir().context("Failed to get current directory")?;
+  let current_dir = env::current_dir().context(
+    "Failed to determine the current working directory.\n\nhint: Run opx from a project directory that still exists on disk.",
+  )?;
 
   let original_force_color = env::var_os(FORCE_COLOR);
   let force_color_str = env::var(FORCE_COLOR).unwrap_or_default();
@@ -51,6 +62,13 @@ pub fn run_op_command(
     .iter()
     .filter_map(|e| e.path().strip_prefix(&current_dir).ok())
     .for_each(|path| println!("[ENV] {}", path.display()));
+
+  if env_files.is_empty() {
+    println!("[OPX] No .env files found under {}.", current_dir.display());
+    println!(
+      "[OPX] hint: Add a .env file with 1Password references, for example FOO=\"op://vault/item/field\"."
+    );
+  }
 
   let op_env_flags: Vec<String> = env_files
     .iter()
@@ -94,26 +112,60 @@ pub fn run_op_command(
 
   println!("{fmt_string}");
 
-  let mut command_spawn = command.spawn().context("Failed to execute command")?;
-  let status = command_spawn
-    .wait()
-    .context("Failed to wait for child process")?;
+  let mut command_spawn = match command.spawn() {
+    Ok(child) => child,
+    Err(error) if error.kind() == ErrorKind::NotFound => {
+      restore_force_color(original_force_color);
+      bail!(
+        "Failed to start 1Password CLI `op`.\n\nwhere: {}\nwhy: opx runs your command through `op run`, but no executable named `op` was found on PATH.\nhint: Install the 1Password CLI and make sure `op --version` works in this terminal.",
+        current_dir.display()
+      );
+    }
+    Err(error) => {
+      restore_force_color(original_force_color);
+      bail!(
+        "Failed to start command through `op run`.\n\nwhere: {}\ncommand: op run ... -- {} {}\nwhy: {}\nhint: Check that the 1Password CLI is installed and that `{}` is available on PATH.",
+        current_dir.display(),
+        package_manager,
+        args_clone.join(" "),
+        error,
+        package_manager
+      );
+    }
+  };
+  let status = match command_spawn.wait() {
+    Ok(status) => status,
+    Err(error) => {
+      restore_force_color(original_force_color);
+      bail!(
+        "Failed while waiting for the command launched by `op run`.\n\ncommand: {} {}\nwhy: {}\nhint: Try running the printed `op run` command directly to see whether the child process is being interrupted.",
+        package_manager,
+        args_clone.join(" "),
+        error
+      );
+    }
+  };
 
-  match original_force_color {
-    Some(value) => env::set_var(FORCE_COLOR, value),
-    None => env::remove_var(FORCE_COLOR),
-  }
+  restore_force_color(original_force_color);
 
   if !status.success() {
-    bail!("Command failed: {}", status);
+    bail!(
+      "The command launched by opx exited unsuccessfully.\n\ncommand: {} {}\nstatus: {}\nhint: opx successfully started `op run`; inspect the output above from `{}` to fix the failing script.",
+      package_manager,
+      args_clone.join(" "),
+      status,
+      package_manager
+    );
   }
 
   Ok(())
 }
 
 /// Get all `DirEntry` for every `.env` file from the current directory
-pub fn get_env_files() -> Vec<DirEntry> {
-  let current_dir = env::current_dir().expect("Failed to get current directory");
+pub fn get_env_files() -> Result<Vec<DirEntry>> {
+  let current_dir = env::current_dir().context(
+    "Failed to determine the current working directory while scanning for .env files.\n\nhint: Run opx from a project directory that still exists on disk.",
+  )?;
 
   // All the dirs with .env files excluding certain skipped folders
   let directories = WalkDir::new(&current_dir)
@@ -130,5 +182,5 @@ pub fn get_env_files() -> Vec<DirEntry> {
     }
   }
 
-  env_files
+  Ok(env_files)
 }

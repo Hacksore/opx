@@ -10,7 +10,9 @@ use dirs::home_dir;
 use std::env;
 
 fn main() -> Result<()> {
-  let current_dir = env::current_dir().context("Failed to get current directory")?;
+  let current_dir = env::current_dir().context(
+    "Failed to determine the current working directory.\n\nhint: Run opx from a project directory that still exists on disk.",
+  )?;
 
   // if they are in their home dir then tell them to go to a project
   if Some(current_dir.as_path()) == home_dir().as_deref() {
@@ -19,7 +21,7 @@ fn main() -> Result<()> {
   }
 
   // NOTE: this is expensive
-  let env_files = get_env_files();
+  let env_files = get_env_files()?;
   let cli_args = env::args().skip(1).collect::<Vec<String>>();
 
   // read config from the local director if possible
