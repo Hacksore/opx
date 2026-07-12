@@ -9,9 +9,17 @@ use tracing::{debug, info, warn};
 use walkdir::{DirEntry, WalkDir};
 
 const FORCE_COLOR: &str = "FORCE_COLOR";
+pub const OPX_ALLOW_NESTED: &str = "OPX_ALLOW_NESTED";
+pub const OPX_DEPTH: &str = "OPX_DEPTH";
 const PROD_ENV: &str = "prod";
 const DEV_ENV: &str = "dev";
 const STAGING_ENV: &str = "staging";
+
+fn log_debug_lines(message: &str) {
+  for line in message.lines().filter(|line| !line.trim().is_empty()) {
+    debug!("{line}");
+  }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParsedCliArgs {
@@ -24,6 +32,36 @@ fn restore_force_color(original_force_color: Option<OsString>) {
     Some(value) => env::set_var(FORCE_COLOR, value),
     None => env::remove_var(FORCE_COLOR),
   }
+}
+
+fn current_opx_depth() -> Result<u32> {
+  match env::var(OPX_DEPTH) {
+    Ok(value) => value.parse::<u32>().with_context(|| {
+      format!(
+        "Invalid {OPX_DEPTH} value `{value}`.\n\nwhy: opx uses {OPX_DEPTH} to detect recursive invocations.\nhint: Unset {OPX_DEPTH}, or set it to a non-negative integer."
+      )
+    }),
+    Err(env::VarError::NotPresent) => Ok(0),
+    Err(env::VarError::NotUnicode(_)) => bail!(
+      "Invalid {OPX_DEPTH} value.\n\nwhy: opx uses {OPX_DEPTH} to detect recursive invocations, but the value is not valid UTF-8.\nhint: Unset {OPX_DEPTH}, or set it to a non-negative integer."
+    ),
+  }
+}
+
+fn allows_nested_opx() -> bool {
+  env::var(OPX_ALLOW_NESTED).is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+}
+
+pub fn ensure_not_nested_opx() -> Result<()> {
+  let depth = current_opx_depth()?;
+
+  if depth == 0 || allows_nested_opx() {
+    return Ok(());
+  }
+
+  bail!(
+    "Refusing to run opx inside an opx-managed command.\n\nwhy: {OPX_DEPTH} is already set to {depth}, which means this process was started by opx. Running opx again usually recurses, for example `opx -> pnpm dev -> opx`.\nhint: Remove `opx` from the package script and let opx run the raw command, for example `\"dev\": \"next dev\"`, then start the app with `opx`.\n\nIf you intentionally need nested opx, set {OPX_ALLOW_NESTED}=1."
+  );
 }
 
 fn shorthand_env_arg(arg: &str) -> Option<&'static str> {
@@ -226,13 +264,13 @@ pub fn run_op_command(
         warn!(
           directory = %current_dir.display(),
           environment,
-          "No .env.{environment} files found.\n\nhint: Add a .env.{environment} file with 1Password references, or run without an environment flag to load .env files."
+          "No .env.{environment} files found. hint: Add a .env.{environment} file with 1Password references, or run without an environment flag to load .env files."
         );
       }
       None => {
         warn!(
           directory = %current_dir.display(),
-          "No .env files found.\n\nhint: Add a .env file with 1Password references, for example FOO=\"op://vault/item/field\"."
+          "No .env files found. hint: Add a .env file with 1Password references, for example FOO=\"op://vault/item/field\"."
         );
       }
     }
@@ -261,6 +299,7 @@ pub fn run_op_command(
 
   let mut binding = Command::new("op");
   let command = binding
+    .env(OPX_DEPTH, (current_opx_depth()? + 1).to_string())
     .arg("run")
     .args(op_env_flags)
     .arg("--")
@@ -288,7 +327,7 @@ pub fn run_op_command(
     env_file_count = env_file_paths.len(),
     "Running command through 1Password"
   );
-  debug!("{fmt_string}");
+  log_debug_lines(&fmt_string);
 
   let mut command_spawn = match command.spawn() {
     Ok(child) => child,
@@ -372,8 +411,8 @@ fn get_env_files_from_dir(current_dir: &Path, selected_env: Option<&str>) -> Res
 #[cfg(test)]
 mod tests {
   use super::{
-    env_file_sort_key, get_env_files_from_dir, is_valid_env_file, parse_cli_args, run_op_command,
-    ParsedCliArgs, FORCE_COLOR,
+    ensure_not_nested_opx, env_file_sort_key, get_env_files_from_dir, is_valid_env_file,
+    parse_cli_args, run_op_command, ParsedCliArgs, FORCE_COLOR, OPX_ALLOW_NESTED, OPX_DEPTH,
   };
   use std::env;
   use std::ffi::OsString;
@@ -387,8 +426,11 @@ mod tests {
     current_dir: PathBuf,
     path: Option<OsString>,
     force_color: Option<OsString>,
+    opx_allow_nested: Option<OsString>,
+    opx_depth: Option<OsString>,
     mock_args: Option<OsString>,
     mock_force_color: Option<OsString>,
+    mock_opx_depth: Option<OsString>,
     mock_exit: Option<OsString>,
   }
 
@@ -398,8 +440,11 @@ mod tests {
         current_dir: env::current_dir().unwrap(),
         path: env::var_os("PATH"),
         force_color: env::var_os(FORCE_COLOR),
+        opx_allow_nested: env::var_os(OPX_ALLOW_NESTED),
+        opx_depth: env::var_os(OPX_DEPTH),
         mock_args: env::var_os("OPX_MOCK_ARGS"),
         mock_force_color: env::var_os("OPX_MOCK_FORCE_COLOR"),
+        mock_opx_depth: env::var_os("OPX_MOCK_OPX_DEPTH"),
         mock_exit: env::var_os("OPX_MOCK_EXIT"),
       }
     }
@@ -410,8 +455,11 @@ mod tests {
       env::set_current_dir(&self.current_dir).unwrap();
       restore_env_var("PATH", self.path.as_ref());
       restore_env_var(FORCE_COLOR, self.force_color.as_ref());
+      restore_env_var(OPX_ALLOW_NESTED, self.opx_allow_nested.as_ref());
+      restore_env_var(OPX_DEPTH, self.opx_depth.as_ref());
       restore_env_var("OPX_MOCK_ARGS", self.mock_args.as_ref());
       restore_env_var("OPX_MOCK_FORCE_COLOR", self.mock_force_color.as_ref());
+      restore_env_var("OPX_MOCK_OPX_DEPTH", self.mock_opx_depth.as_ref());
       restore_env_var("OPX_MOCK_EXIT", self.mock_exit.as_ref());
     }
   }
@@ -466,6 +514,9 @@ mod tests {
       r#"#!/bin/sh
 printf '%s\n' "$@" > "$OPX_MOCK_ARGS"
 printf '%s\n' "${FORCE_COLOR-}" > "$OPX_MOCK_FORCE_COLOR"
+if [ -n "${OPX_MOCK_OPX_DEPTH-}" ]; then
+  printf '%s\n' "${OPX_DEPTH-}" > "$OPX_MOCK_OPX_DEPTH"
+fi
 exit "${OPX_MOCK_EXIT:-0}"
 "#,
     )
@@ -481,6 +532,7 @@ exit "${OPX_MOCK_EXIT:-0}"
       r#"@echo off
 for %%a in (%*) do echo %%~a>> "%OPX_MOCK_ARGS%"
 echo %FORCE_COLOR%> "%OPX_MOCK_FORCE_COLOR%"
+if not "%OPX_MOCK_OPX_DEPTH%"=="" echo %OPX_DEPTH%> "%OPX_MOCK_OPX_DEPTH%"
 exit /B %OPX_MOCK_EXIT%
 "#,
     )
@@ -632,6 +684,40 @@ exit /B %OPX_MOCK_EXIT%
   }
 
   #[test]
+  fn nested_opx_detection_allows_first_invocation() {
+    let _lock = process_state_lock().lock().unwrap();
+    let _guard = ProcessStateGuard::capture();
+    env::remove_var(OPX_ALLOW_NESTED);
+    env::remove_var(OPX_DEPTH);
+
+    ensure_not_nested_opx().unwrap();
+  }
+
+  #[test]
+  fn nested_opx_detection_rejects_recursive_invocation() {
+    let _lock = process_state_lock().lock().unwrap();
+    let _guard = ProcessStateGuard::capture();
+    env::remove_var(OPX_ALLOW_NESTED);
+    env::set_var(OPX_DEPTH, "1");
+
+    let error = ensure_not_nested_opx().unwrap_err();
+
+    assert!(error
+      .to_string()
+      .contains("Refusing to run opx inside an opx-managed command"));
+  }
+
+  #[test]
+  fn nested_opx_detection_allows_explicit_override() {
+    let _lock = process_state_lock().lock().unwrap();
+    let _guard = ProcessStateGuard::capture();
+    env::set_var(OPX_ALLOW_NESTED, "1");
+    env::set_var(OPX_DEPTH, "1");
+
+    ensure_not_nested_opx().unwrap();
+  }
+
+  #[test]
   fn run_op_command_constructs_op_run_and_restores_force_color() {
     let _lock = process_state_lock().lock().unwrap();
     let _guard = ProcessStateGuard::capture();
@@ -639,6 +725,7 @@ exit /B %OPX_MOCK_EXIT%
     let bin_dir = temp_dir.path().join("bin");
     let args_file = temp_dir.path().join("args.txt");
     let force_color_file = temp_dir.path().join("force_color.txt");
+    let opx_depth_file = temp_dir.path().join("opx_depth.txt");
 
     create_mock_op(&bin_dir);
     fs::write(temp_dir.path().join(".env"), "ROOT=1").unwrap();
@@ -649,8 +736,10 @@ exit /B %OPX_MOCK_EXIT%
     env::set_current_dir(temp_dir.path()).unwrap();
     env::set_var("PATH", prepend_path(&bin_dir));
     env::remove_var(FORCE_COLOR);
+    env::remove_var(OPX_DEPTH);
     env::set_var("OPX_MOCK_ARGS", &args_file);
     env::set_var("OPX_MOCK_FORCE_COLOR", &force_color_file);
+    env::set_var("OPX_MOCK_OPX_DEPTH", &opx_depth_file);
     env::set_var("OPX_MOCK_EXIT", "0");
 
     run_op_command(env_files, args(&["run", "dev"]), "npm", None).unwrap();
@@ -675,6 +764,7 @@ exit /B %OPX_MOCK_EXIT%
       ]
     );
     assert_eq!(fs::read_to_string(force_color_file).unwrap().trim(), "1");
+    assert_eq!(fs::read_to_string(opx_depth_file).unwrap().trim(), "1");
     assert!(env::var_os(FORCE_COLOR).is_none());
   }
 

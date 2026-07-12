@@ -3,7 +3,7 @@
 mod config;
 mod util;
 
-use crate::util::{get_env_files, parse_cli_args, run_op_command};
+use crate::util::{ensure_not_nested_opx, get_env_files, parse_cli_args, run_op_command};
 use anyhow::{Context, Result};
 use config::OpxConfig;
 use dirs::home_dir;
@@ -25,19 +25,51 @@ fn init_logging() {
     .try_init();
 }
 
-fn format_error(error: &anyhow::Error) -> String {
-  let mut message = error.to_string();
+fn append_non_empty_lines(lines: &mut Vec<String>, message: impl AsRef<str>) {
+  lines.extend(
+    message
+      .as_ref()
+      .lines()
+      .filter(|line| !line.trim().is_empty())
+      .map(str::to_string),
+  );
+}
+
+fn append_prefixed_non_empty_lines(
+  lines: &mut Vec<String>,
+  prefix: &str,
+  message: impl AsRef<str>,
+) {
+  lines.extend(
+    message
+      .as_ref()
+      .lines()
+      .filter(|line| !line.trim().is_empty())
+      .map(|line| format!("{prefix}{line}")),
+  );
+}
+
+fn format_error_lines(error: &anyhow::Error) -> Vec<String> {
+  let mut lines = vec![];
   let causes = error.chain().skip(1).collect::<Vec<_>>();
 
+  append_non_empty_lines(&mut lines, error.to_string());
+
   if !causes.is_empty() {
-    message.push_str("\n\ncaused by:");
+    lines.push("caused by:".to_string());
 
     for cause in causes {
-      message.push_str(&format!("\n  - {cause}"));
+      append_prefixed_non_empty_lines(&mut lines, "  - ", cause.to_string());
     }
   }
 
-  message
+  lines
+}
+
+fn log_error(error: &anyhow::Error) {
+  for line in format_error_lines(error) {
+    error!("{line}");
+  }
 }
 
 fn default_script_args(package_manager: &str, default_script: &str) -> Vec<String> {
@@ -54,7 +86,7 @@ fn main() -> ExitCode {
   match run() {
     Ok(()) => ExitCode::SUCCESS,
     Err(error) => {
-      error!("{}", format_error(&error));
+      log_error(&error);
       ExitCode::FAILURE
     }
   }
@@ -73,6 +105,7 @@ fn run() -> Result<()> {
 
   let cli_args = env::args().skip(1).collect::<Vec<String>>();
   let parsed_args = parse_cli_args(cli_args)?;
+  ensure_not_nested_opx()?;
 
   // NOTE: this is expensive
   let env_files = get_env_files(parsed_args.selected_env.as_deref())?;
@@ -99,6 +132,7 @@ fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
   use super::default_script_args;
+  use anyhow::anyhow;
 
   #[test]
   fn default_script_uses_npm_run_for_npm() {
@@ -109,5 +143,25 @@ mod tests {
   fn default_script_uses_direct_script_for_other_package_managers() {
     assert_eq!(default_script_args("pnpm", "dev"), vec!["dev"]);
     assert_eq!(default_script_args("yarn", "server"), vec!["server"]);
+  }
+
+  #[test]
+  fn error_formatting_splits_multiline_messages_for_logger_output() {
+    let error =
+      anyhow!("Failed to run.\n\nhint: Try again.").context("Command failed.\n\nwhere: tests");
+
+    let lines = super::format_error_lines(&error);
+
+    assert_eq!(
+      lines,
+      vec![
+        "Command failed.",
+        "where: tests",
+        "caused by:",
+        "  - Failed to run.",
+        "  - hint: Try again.",
+      ]
+    );
+    assert!(lines.iter().all(|line| !line.contains('\n')));
   }
 }

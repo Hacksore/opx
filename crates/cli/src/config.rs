@@ -34,7 +34,7 @@ impl OpxConfig {
       warn!(
         package_json = %package_json_path.display(),
         package_manager,
-        "packageManager not found in package.json; defaulting to npm.\n\nhint: Add packageManager to package.json to make this explicit."
+        "packageManager not found in package.json; defaulting to npm. hint: Add packageManager to package.json to make this explicit."
       );
     }
 
@@ -46,7 +46,7 @@ impl OpxConfig {
           warn!(
             package_json = %package_json_path.display(),
             default_script,
-            "opx.defaultScript in package.json is empty; defaulting to dev.\n\nhint: Set opx.defaultScript to a package script name like `start` or `server`."
+            "opx.defaultScript in package.json is empty; defaulting to dev. hint: Set opx.defaultScript to a package script name like `start` or `server`."
           );
         } else {
           default_script = configured_default_script.to_string();
@@ -56,7 +56,7 @@ impl OpxConfig {
         warn!(
           package_json = %package_json_path.display(),
           default_script,
-          "opx in package.json must be an object; defaulting to dev.\n\nhint: Configure it as `\"opx\": {{ \"defaultScript\": \"start\" }}`."
+          "opx in package.json must be an object; defaulting to dev. hint: Configure it as `\"opx\": {{ \"defaultScript\": \"start\" }}`."
         );
       }
     }

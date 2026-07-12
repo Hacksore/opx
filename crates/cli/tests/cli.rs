@@ -31,6 +31,9 @@ fn create_mock_op(bin_dir: &Path) {
     r#"#!/bin/sh
 printf '%s\n' "$@" > "$OPX_MOCK_ARGS"
 printf '%s\n' "${FORCE_COLOR-}" > "$OPX_MOCK_FORCE_COLOR"
+if [ -n "${OPX_MOCK_OPX_DEPTH-}" ]; then
+  printf '%s\n' "${OPX_DEPTH-}" > "$OPX_MOCK_OPX_DEPTH"
+fi
 exit "${OPX_MOCK_EXIT:-0}"
 "#,
   )
@@ -46,6 +49,7 @@ fn create_mock_op(bin_dir: &Path) {
     r#"@echo off
 for %%a in (%*) do echo %%~a>> "%OPX_MOCK_ARGS%"
 echo %FORCE_COLOR%> "%OPX_MOCK_FORCE_COLOR%"
+if not "%OPX_MOCK_OPX_DEPTH%"=="" echo %OPX_DEPTH%> "%OPX_MOCK_OPX_DEPTH%"
 exit /B %OPX_MOCK_EXIT%
 "#,
   )
@@ -175,6 +179,24 @@ fn fails_when_package_json_is_invalid() {
     .failure()
     .stderr(predicates::str::contains(
       "Failed to parse package.json as JSON",
+    ));
+}
+
+#[test]
+fn fails_fast_when_invoked_inside_opx_managed_command() {
+  let temp_dir = tempfile::tempdir().unwrap();
+  fs::write(
+    temp_dir.path().join("package.json"),
+    r#"{"packageManager":"pnpm@10.0.0"}"#,
+  )
+  .unwrap();
+
+  opx_command(temp_dir.path())
+    .env("OPX_DEPTH", "1")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains(
+      "Refusing to run opx inside an opx-managed command",
     ));
 }
 
