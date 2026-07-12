@@ -117,6 +117,55 @@ fn runs_default_script_through_mocked_op() {
 }
 
 #[test]
+fn runs_raw_default_command_through_mocked_op() {
+  let temp_dir = tempfile::tempdir().unwrap();
+  let project_dir = temp_dir.path();
+  let bin_dir = project_dir.join("bin");
+  let args_file = project_dir.join("args.txt");
+  let force_color_file = project_dir.join("force_color.txt");
+
+  create_mock_op(&bin_dir);
+  fs::write(
+    project_dir.join("package.json"),
+    r#"{
+      "packageManager": "pnpm@10.0.0",
+      "scripts": {
+        "dev": "opx"
+      },
+      "opx": {
+        "defaultCommand": "next dev"
+      }
+    }"#,
+  )
+  .unwrap();
+  fs::write(project_dir.join(".env"), "ROOT=1").unwrap();
+  let canonical_project_dir = fs::canonicalize(project_dir).unwrap();
+
+  opx_command(project_dir)
+    .env("PATH", prepend_path(&bin_dir))
+    .env("OPX_MOCK_ARGS", &args_file)
+    .env("OPX_MOCK_FORCE_COLOR", &force_color_file)
+    .env("OPX_MOCK_EXIT", "0")
+    .assert()
+    .success();
+
+  assert_eq!(
+    read_lines(args_file),
+    vec![
+      "run".to_string(),
+      format!(
+        "--env-file={}",
+        canonical_project_dir.join(".env").display()
+      ),
+      "--".to_string(),
+      "next".to_string(),
+      "dev".to_string(),
+    ]
+  );
+  assert_eq!(fs::read_to_string(force_color_file).unwrap().trim(), "1");
+}
+
+#[test]
 fn runs_selected_environment_and_preserves_command_args_after_separator() {
   let temp_dir = tempfile::tempdir().unwrap();
   let project_dir = temp_dir.path();

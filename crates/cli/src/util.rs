@@ -232,10 +232,13 @@ pub fn is_skip_dir(entry: &DirEntry) -> bool {
 /// Run the `op` command with all the `.env` vars files found in the current directory
 pub fn run_op_command(
   env_files: Vec<DirEntry>,
-  args: Vec<String>,
-  package_manager: &str,
+  command_args: Vec<String>,
   selected_env: Option<&str>,
 ) -> Result<()> {
+  if command_args.is_empty() {
+    bail!("Missing command to run.\n\nhint: Pass a command to opx, or configure `opx.defaultScript` / `opx.defaultCommand` in package.json.");
+  }
+
   let current_dir = env::current_dir().context(
     "Failed to determine the current working directory.\n\nhint: Run opx from a project directory that still exists on disk.",
   )?;
@@ -294,8 +297,7 @@ pub fn run_op_command(
     })
     .collect();
 
-  let args_clone = args.clone();
-  let command_display = format!("{} {}", package_manager, args_clone.join(" "));
+  let command_display = command_args.join(" ");
 
   let mut binding = Command::new("op");
   let command = binding
@@ -303,22 +305,16 @@ pub fn run_op_command(
     .arg("run")
     .args(op_env_flags)
     .arg("--")
-    .arg(package_manager)
-    .args(args)
+    .args(&command_args)
     .stdin(Stdio::inherit())
     .stdout(Stdio::inherit())
     .stderr(Stdio::inherit());
 
   let flags = op_env_flags_display.join("\n");
   let fmt_string = if flags.is_empty() {
-    format!("op run -- {} {}", package_manager, args_clone.join(" "))
+    format!("op run -- {command_display}")
   } else {
-    format!(
-      "op run \\\n{} -- {} {}",
-      flags,
-      package_manager,
-      args_clone.join(" ")
-    )
+    format!("op run \\\n{} -- {command_display}", flags)
   };
 
   info!(
@@ -341,12 +337,10 @@ pub fn run_op_command(
     Err(error) => {
       restore_force_color(original_force_color);
       bail!(
-        "Failed to start command through `op run`.\n\nwhere: {}\ncommand: op run ... -- {} {}\nwhy: {}\nhint: Check that the 1Password CLI is installed and that `{}` is available on PATH.",
+        "Failed to start command through `op run`.\n\nwhere: {}\ncommand: op run ... -- {}\nwhy: {}\nhint: Check that the 1Password CLI is installed and that the command is available on PATH.",
         current_dir.display(),
-        package_manager,
-        args_clone.join(" "),
+        command_display,
         error,
-        package_manager
       );
     }
   };
@@ -355,9 +349,8 @@ pub fn run_op_command(
     Err(error) => {
       restore_force_color(original_force_color);
       bail!(
-        "Failed while waiting for the command launched by `op run`.\n\ncommand: {} {}\nwhy: {}\nhint: Try running the printed `op run` command directly to see whether the child process is being interrupted.",
-        package_manager,
-        args_clone.join(" "),
+        "Failed while waiting for the command launched by `op run`.\n\ncommand: {}\nwhy: {}\nhint: Try running the printed `op run` command directly to see whether the child process is being interrupted.",
+        command_display,
         error
       );
     }
@@ -367,11 +360,10 @@ pub fn run_op_command(
 
   if !status.success() {
     bail!(
-      "The command launched by opx exited unsuccessfully.\n\ncommand: {} {}\nstatus: {}\nhint: opx successfully started `op run`; inspect the output above from `{}` to fix the failing script.",
-      package_manager,
-      args_clone.join(" "),
+      "The command launched by opx exited unsuccessfully.\n\ncommand: {}\nstatus: {}\nhint: opx successfully started `op run`; inspect the output above from `{}` to fix the failing script.",
+      command_display,
       status,
-      package_manager
+      command_args[0]
     );
   }
 
@@ -742,7 +734,7 @@ exit /B %OPX_MOCK_EXIT%
     env::set_var("OPX_MOCK_OPX_DEPTH", &opx_depth_file);
     env::set_var("OPX_MOCK_EXIT", "0");
 
-    run_op_command(env_files, args(&["run", "dev"]), "npm", None).unwrap();
+    run_op_command(env_files, args(&["npm", "run", "dev"]), None).unwrap();
 
     let recorded_args = fs::read_to_string(args_file).unwrap();
     assert_eq!(
@@ -779,7 +771,7 @@ exit /B %OPX_MOCK_EXIT%
     env::set_var("PATH", &empty_bin_dir);
     env::set_var(FORCE_COLOR, "false");
 
-    let error = run_op_command(vec![], args(&["dev"]), "pnpm", None).unwrap_err();
+    let error = run_op_command(vec![], args(&["pnpm", "dev"]), None).unwrap_err();
 
     assert!(error
       .to_string()
@@ -804,7 +796,7 @@ exit /B %OPX_MOCK_EXIT%
     env::set_var("OPX_MOCK_FORCE_COLOR", &force_color_file);
     env::set_var("OPX_MOCK_EXIT", "7");
 
-    let error = run_op_command(vec![], args(&["dev"]), "pnpm", None).unwrap_err();
+    let error = run_op_command(vec![], args(&["pnpm", "dev"]), None).unwrap_err();
 
     assert!(error
       .to_string()

@@ -43,6 +43,43 @@ It will check [`packageManager`](https://nodejs.org/dist/latest/docs/api/all.htm
 }
 ```
 
+If your package script points back at `opx`, use `opx.defaultCommand` to run the underlying command directly.
+
+```json
+{
+  "scripts": {
+    "dev": "opx"
+  },
+  "opx": {
+    "defaultCommand": "next dev"
+  }
+}
+```
+
+`defaultCommand` is passed directly after `op run --`, so the example above runs `op run -- next dev`. It can also be an exact argument array:
+
+Because `defaultCommand` runs directly, it does not automatically add your Node project's local `node_modules/.bin` directory to `PATH`. If you want to run a project-local binary, use your package runner, for example:
+
+```json
+{
+  "opx": {
+    "defaultCommand": "npx next dev"
+  }
+}
+```
+
+For exact argument control, `defaultCommand` can also be an array:
+
+```json
+{
+  "opx": {
+    "defaultCommand": ["next", "dev", "--hostname", "0.0.0.0"]
+  }
+}
+```
+
+`defaultCommand` is parsed into command arguments; it does not run through a shell. For shell features like `&&`, pipes, or redirects, use an explicit shell command such as `["sh", "-c", "next dev && echo done"]`.
+
 You can run any script in your applications `package.json` with `opx <args>`.
 
 

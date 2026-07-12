@@ -24,6 +24,47 @@ By default, `opx` runs the `dev` package script. You can override this in `packa
 }
 ```
 
+If your package script would recurse back into `opx`, configure a raw command instead:
+
+```json
+{
+  "scripts": {
+    "dev": "opx"
+  },
+  "opx": {
+    "defaultCommand": "next dev"
+  }
+}
+```
+
+That runs:
+
+```sh
+op run --env-file=.env -- next dev
+```
+
+Because `defaultCommand` runs directly, it does not automatically add your Node project's local `node_modules/.bin` directory to `PATH`. If you want to run a project-local binary, use your package runner, for example:
+
+```json
+{
+  "opx": {
+    "defaultCommand": "npx next dev"
+  }
+}
+```
+
+For exact argument control, `defaultCommand` can also be an array:
+
+```json
+{
+  "opx": {
+    "defaultCommand": ["next", "dev", "--hostname", "0.0.0.0"]
+  }
+}
+```
+
+`defaultCommand` is parsed into command arguments; it does not run through a shell. For shell features like `&&`, pipes, or redirects, use an explicit shell command such as `["sh", "-c", "next dev && echo done"]`.
+
 Explicit command args still take precedence:
 
 ```sh

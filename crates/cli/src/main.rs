@@ -80,6 +80,23 @@ fn default_script_args(package_manager: &str, default_script: &str) -> Vec<Strin
   vec![default_script.to_string()]
 }
 
+fn package_manager_command(package_manager: &str, args: Vec<String>) -> Vec<String> {
+  let mut command = vec![package_manager.to_string()];
+  command.extend(args);
+  command
+}
+
+fn default_command_args(config: &OpxConfig) -> Vec<String> {
+  if let Some(default_command) = config.get_default_command() {
+    return default_command.to_vec();
+  }
+
+  package_manager_command(
+    config.get_package_manager(),
+    default_script_args(config.get_package_manager(), config.get_default_script()),
+  )
+}
+
 fn main() -> ExitCode {
   init_logging();
 
@@ -112,26 +129,20 @@ fn run() -> Result<()> {
 
   // read config from the local director if possible
   let config = OpxConfig::new()?;
-  let package_manager = config.get_package_manager();
-
-  let op_args = match parsed_args.command_args {
-    args if args.is_empty() => default_script_args(package_manager, config.get_default_script()),
-    args => args,
+  let op_command = match parsed_args.command_args {
+    args if args.is_empty() => default_command_args(&config),
+    args => package_manager_command(config.get_package_manager(), args),
   };
 
-  run_op_command(
-    env_files,
-    op_args,
-    package_manager,
-    parsed_args.selected_env.as_deref(),
-  )?;
+  run_op_command(env_files, op_command, parsed_args.selected_env.as_deref())?;
 
   Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-  use super::default_script_args;
+  use super::{default_command_args, default_script_args, package_manager_command};
+  use crate::config::OpxConfig;
   use anyhow::anyhow;
 
   #[test]
@@ -143,6 +154,36 @@ mod tests {
   fn default_script_uses_direct_script_for_other_package_managers() {
     assert_eq!(default_script_args("pnpm", "dev"), vec!["dev"]);
     assert_eq!(default_script_args("yarn", "server"), vec!["server"]);
+  }
+
+  #[test]
+  fn package_manager_command_prepends_package_manager() {
+    assert_eq!(
+      package_manager_command("pnpm", vec!["db:push".to_string()]),
+      vec!["pnpm", "db:push"]
+    );
+  }
+
+  #[test]
+  fn default_command_uses_raw_default_command_when_configured() {
+    let config = OpxConfig {
+      package_manager: "pnpm".to_string(),
+      default_script: "dev".to_string(),
+      default_command: Some(vec!["next".to_string(), "dev".to_string()]),
+    };
+
+    assert_eq!(default_command_args(&config), vec!["next", "dev"]);
+  }
+
+  #[test]
+  fn default_command_falls_back_to_package_script() {
+    let config = OpxConfig {
+      package_manager: "npm".to_string(),
+      default_script: "start".to_string(),
+      default_command: None,
+    };
+
+    assert_eq!(default_command_args(&config), vec!["npm", "run", "start"]);
   }
 
   #[test]
