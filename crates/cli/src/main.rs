@@ -5,18 +5,25 @@ mod util;
 
 use crate::util::{ensure_not_nested_opx, get_env_files, parse_cli_args, run_op_command};
 use anstyle::{AnsiColor, Color, Style};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use config::OpxConfig;
 use dirs::home_dir;
 use std::env;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 const OPX_VERSION: &str = env!("CARGO_PKG_VERSION");
-const STYLE_BOLD: Style = Style::new().bold();
 const STYLE_DIM: Style = Style::new().dimmed();
-const STYLE_RED: Style = Color::Ansi(AnsiColor::Red).on_default();
+const STYLE_ERROR_SUMMARY: Style = Color::Ansi(AnsiColor::BrightRed).on_default().bold();
+const STYLE_BRIGHT_RED: Style = Color::Ansi(AnsiColor::BrightRed).on_default();
+const STYLE_ERROR_CODE: Style = Color::Ansi(AnsiColor::BrightBlack)
+  .on_default()
+  .bg_color(Some(Color::Ansi(AnsiColor::BrightRed)));
+const STYLE_ERROR_CODE_BRACKET: Style = Color::Ansi(AnsiColor::BrightRed)
+  .on_default()
+  .bg_color(Some(Color::Ansi(AnsiColor::BrightRed)));
 const STYLE_CYAN_BADGE: Style = AnsiColor::Black
   .on_default()
   .bg_color(Some(Color::Ansi(AnsiColor::Cyan)))
@@ -98,7 +105,7 @@ fn append_formatted_error_lines(message: impl AsRef<str>, output: &mut String, i
     return;
   };
 
-  output.push_str(&styled(STYLE_BOLD, summary));
+  output.push_str(&styled(STYLE_ERROR_SUMMARY, summary));
 
   let detail_lines = details
     .iter()
@@ -124,9 +131,61 @@ fn append_formatted_error_lines(message: impl AsRef<str>, output: &mut String, i
   }
 }
 
+fn error_summary(error: &anyhow::Error) -> String {
+  non_empty_lines(error.to_string())
+    .into_iter()
+    .next()
+    .unwrap_or_else(|| "Unexpected opx error.".to_string())
+}
+
+fn error_code_for_summary(summary: &str) -> &'static str {
+  if summary.starts_with("Invalid OPX_DEPTH value") {
+    return "EOPX_INVALID_DEPTH";
+  }
+
+  if summary.starts_with("Invalid environment name") {
+    return "EOPX_INVALID_ENV";
+  }
+
+  match summary {
+    "Failed to determine the current working directory." => "EOPX_CURRENT_DIR",
+    "Failed to determine the current working directory while scanning for .env files." => {
+      "EOPX_ENV_SCAN_CURRENT_DIR"
+    }
+    "Failed to parse opx.defaultCommand." => "EOPX_DEFAULT_COMMAND_PARSE",
+    "Invalid opx.defaultCommand." => "EOPX_DEFAULT_COMMAND_INVALID",
+    "Refusing to run from your home directory." => "EOPX_HOME_DIRECTORY",
+    "Failed to find package.json." => "EOPX_PACKAGE_JSON_NOT_FOUND",
+    "Failed to read package.json." => "EOPX_PACKAGE_JSON_READ",
+    "Failed to parse package.json as JSON." => "EOPX_PACKAGE_JSON_PARSE",
+    "Refusing to run opx inside an opx-managed command." => "EOPX_NESTED_INVOCATION",
+    "Missing environment name." => "EOPX_MISSING_ENV",
+    "Multiple environments were selected." => "EOPX_MULTIPLE_ENVS",
+    "Missing environment after --env." => "EOPX_MISSING_ENV",
+    "Missing command to run." => "EOPX_MISSING_COMMAND",
+    "Failed to start 1Password CLI `op`." => "EOPX_OP_NOT_FOUND",
+    "Failed to start command through `op run`." => "EOPX_OP_START_FAILED",
+    "Failed while waiting for the command launched by `op run`." => "EOPX_OP_WAIT_FAILED",
+    "The command launched by opx exited unsuccessfully." => "EOPX_COMMAND_FAILED",
+    _ => "EOPX_ERROR",
+  }
+}
+
+fn format_error_code_footer(error_code: &str) -> String {
+  format!(
+    "{}{}{} {}",
+    styled(STYLE_ERROR_CODE_BRACKET, "["),
+    styled(STYLE_ERROR_CODE, error_code),
+    styled(STYLE_ERROR_CODE_BRACKET, "]"),
+    styled(STYLE_BRIGHT_RED, "Command failed with exit code 1."),
+  )
+}
+
 fn format_error_message(error: &anyhow::Error) -> String {
   let mut message = String::new();
   let causes = error.chain().skip(1).collect::<Vec<_>>();
+  let summary = error_summary(error);
+  let error_code = error_code_for_summary(&summary);
 
   append_formatted_error_lines(error.to_string(), &mut message, "  ");
 
@@ -145,19 +204,35 @@ fn format_error_message(error: &anyhow::Error) -> String {
     }
   }
 
+  message.push_str("\n\n");
+  message.push_str(&format_error_code_footer(error_code));
+
   message
 }
 
 fn log_error(error: &anyhow::Error) {
-  eprintln!(
-    "{} {}",
-    styled(STYLE_RED, "ERROR"),
-    format_error_message(error)
-  );
+  eprintln!("{}", format_error_message(error));
 }
 
 fn log_startup_banner() {
   info!("Starting opx v{OPX_VERSION}");
+}
+
+fn normalized_path(path: &Path) -> PathBuf {
+  path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn is_home_directory(path: &Path) -> bool {
+  let normalized_current_dir = normalized_path(path);
+
+  home_dir()
+    .as_deref()
+    .is_some_and(|home_path| normalized_path(home_path) == normalized_current_dir)
+    || ["HOME", "USERPROFILE"]
+      .into_iter()
+      .filter_map(env::var_os)
+      .map(PathBuf::from)
+      .any(|home_path| normalized_path(&home_path) == normalized_current_dir)
 }
 
 fn default_script_args(package_manager: &str, default_script: &str) -> Vec<String> {
@@ -203,10 +278,12 @@ fn run() -> Result<()> {
     "Failed to determine the current working directory.\n\nhint: Run opx from a project directory that still exists on disk.",
   )?;
 
-  // if they are in their home dir then tell them to go to a project
-  if Some(current_dir.as_path()) == home_dir().as_deref() {
-    warn!("You are in your home directory. Please go to a project directory.");
-    return Ok(());
+  // Avoid scanning a user's whole home directory when opx was run outside a project.
+  if is_home_directory(&current_dir) {
+    bail!(
+      "Refusing to run from your home directory.\n\nwhere: {}\nwhy: opx must run from a JavaScript project directory.\nhint: Change into your project directory, then run opx again.",
+      current_dir.display()
+    );
   }
 
   let cli_args = env::args().skip(1).collect::<Vec<String>>();
@@ -282,13 +359,79 @@ mod tests {
 
     let message = super::format_error_message(&error);
 
-    assert!(message.contains("\x1b[1mCommand failed.\x1b[0m"));
+    assert!(message.contains("\x1b[1m\x1b[91mCommand failed.\x1b[0m"));
     assert!(message.contains("\x1b[2mcaused by:\x1b[0m"));
-    assert!(message.contains("\x1b[1mFailed to run.\x1b[0m"));
+    assert!(message.contains("\x1b[1m\x1b[91mFailed to run.\x1b[0m"));
     assert!(message.contains("\x1b[1m\x1b[30m\x1b[43m hint"));
+    assert!(message.contains("\x1b[91m\x1b[101m[\x1b[0m"));
+    assert!(message.contains("\x1b[90m\x1b[101mEOPX_ERROR\x1b[0m"));
+    assert!(message.contains("\x1b[91m\x1b[101m]\x1b[0m"));
+    assert!(message.contains("\x1b[91mCommand failed with exit code 1.\x1b[0m"));
     assert!(!message.contains("where"));
     assert!(!message.contains("where:"));
     assert!(!message.contains("hint:"));
     assert!(message.contains("\n\n"));
+  }
+
+  #[test]
+  fn error_codes_cover_known_error_summaries() {
+    let cases = [
+      (
+        "Failed to determine the current working directory.",
+        "EOPX_CURRENT_DIR",
+      ),
+      (
+        "Failed to determine the current working directory while scanning for .env files.",
+        "EOPX_ENV_SCAN_CURRENT_DIR",
+      ),
+      (
+        "Failed to parse opx.defaultCommand.",
+        "EOPX_DEFAULT_COMMAND_PARSE",
+      ),
+      (
+        "Invalid opx.defaultCommand.",
+        "EOPX_DEFAULT_COMMAND_INVALID",
+      ),
+      (
+        "Refusing to run from your home directory.",
+        "EOPX_HOME_DIRECTORY",
+      ),
+      (
+        "Failed to find package.json.",
+        "EOPX_PACKAGE_JSON_NOT_FOUND",
+      ),
+      ("Failed to read package.json.", "EOPX_PACKAGE_JSON_READ"),
+      (
+        "Failed to parse package.json as JSON.",
+        "EOPX_PACKAGE_JSON_PARSE",
+      ),
+      ("Invalid OPX_DEPTH value `abc`.", "EOPX_INVALID_DEPTH"),
+      (
+        "Refusing to run opx inside an opx-managed command.",
+        "EOPX_NESTED_INVOCATION",
+      ),
+      ("Missing environment name.", "EOPX_MISSING_ENV"),
+      ("Invalid environment name `prod!`.", "EOPX_INVALID_ENV"),
+      ("Multiple environments were selected.", "EOPX_MULTIPLE_ENVS"),
+      ("Missing environment after --env.", "EOPX_MISSING_ENV"),
+      ("Missing command to run.", "EOPX_MISSING_COMMAND"),
+      ("Failed to start 1Password CLI `op`.", "EOPX_OP_NOT_FOUND"),
+      (
+        "Failed to start command through `op run`.",
+        "EOPX_OP_START_FAILED",
+      ),
+      (
+        "Failed while waiting for the command launched by `op run`.",
+        "EOPX_OP_WAIT_FAILED",
+      ),
+      (
+        "The command launched by opx exited unsuccessfully.",
+        "EOPX_COMMAND_FAILED",
+      ),
+    ];
+
+    for (summary, code) in cases {
+      assert_eq!(super::error_code_for_summary(summary), code);
+    }
   }
 }

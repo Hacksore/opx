@@ -218,23 +218,49 @@ fn fails_when_package_json_is_missing() {
   let temp_dir = tempfile::tempdir().unwrap();
 
   let assert = opx_command(temp_dir.path()).assert().failure().stderr(
-    predicates::str::contains("ERROR").count(1).and(
+    predicates::str::contains("ERROR").count(0).and(
       predicates::str::contains("Failed to find package.json.")
         .and(predicates::str::contains(
           "opx reads package.json to choose which package manager to run.",
         ))
         .and(predicates::str::contains(" hint "))
-        .and(predicates::str::contains("Run opx from the root")),
+        .and(predicates::str::contains("Run opx from the root"))
+        .and(predicates::str::contains(
+          "Command failed with exit code 1.",
+        ))
+        .and(predicates::str::contains("EOPX_PACKAGE_JSON_NOT_FOUND")),
     ),
   );
   let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
   let startup_index = stderr.find("opx v").unwrap();
-  let error_index = stderr.find("ERROR").unwrap();
+  let error_index = stderr.find("Failed to find package.json.").unwrap();
 
   assert!(
     startup_index < error_index,
     "startup banner should be printed before errors\n{stderr}"
   );
+}
+
+#[test]
+fn fails_when_run_from_home_directory() {
+  let temp_dir = tempfile::tempdir().unwrap();
+
+  opx_command(temp_dir.path())
+    .env("HOME", temp_dir.path())
+    .env("USERPROFILE", temp_dir.path())
+    .assert()
+    .failure()
+    .stderr(
+      predicates::str::contains("Refusing to run from your home directory.")
+        .and(predicates::str::contains(
+          "opx must run from a JavaScript project directory.",
+        ))
+        .and(predicates::str::contains(" hint "))
+        .and(predicates::str::contains(
+          "Change into your project directory, then run opx again.",
+        ))
+        .and(predicates::str::contains("EOPX_HOME_DIRECTORY")),
+    );
 }
 
 #[test]
