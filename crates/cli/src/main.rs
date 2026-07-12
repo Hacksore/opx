@@ -21,6 +21,7 @@ fn init_logging() {
     .with_target(false)
     .without_time()
     .compact()
+    .with_writer(std::io::stderr)
     .try_init();
 }
 
@@ -37,6 +38,14 @@ fn format_error(error: &anyhow::Error) -> String {
   }
 
   message
+}
+
+fn default_script_args(package_manager: &str, default_script: &str) -> Vec<String> {
+  if package_manager == "npm" {
+    return vec!["run".to_string(), default_script.to_string()];
+  }
+
+  vec![default_script.to_string()]
 }
 
 fn main() -> ExitCode {
@@ -72,9 +81,8 @@ fn run() -> Result<()> {
   let config = OpxConfig::new()?;
   let package_manager = config.get_package_manager();
 
-  // TODO: default command for now is start but this should be configurable
   let op_args = match parsed_args.command_args {
-    args if args.is_empty() => vec!["start".to_string()],
+    args if args.is_empty() => default_script_args(package_manager, config.get_default_script()),
     args => args,
   };
 
@@ -86,4 +94,20 @@ fn run() -> Result<()> {
   )?;
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::default_script_args;
+
+  #[test]
+  fn default_script_uses_npm_run_for_npm() {
+    assert_eq!(default_script_args("npm", "dev"), vec!["run", "dev"]);
+  }
+
+  #[test]
+  fn default_script_uses_direct_script_for_other_package_managers() {
+    assert_eq!(default_script_args("pnpm", "dev"), vec!["dev"]);
+    assert_eq!(default_script_args("yarn", "server"), vec!["server"]);
+  }
 }

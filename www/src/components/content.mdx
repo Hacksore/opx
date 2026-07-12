@@ -11,7 +11,7 @@ This is a CLI meant to enhance the native [1Passwords native CLI (`op`)](https:/
 While you can run the following 1Password `op run` CLI there is a bit of manual effort to pass the additional flags where each one of your `.env` files is located.
 
 ```
-op run --env-file=.env -- pnpm start
+op run --env-file=.env -- pnpm dev
 ```
 
 With `opx` it will scan you current working directory for any `.env` files and load them as variadic `--env-file` argument(s).
@@ -33,7 +33,17 @@ Start your application to inject the secrets as environment variables.
 opx
 ```
 
-It will check [`packageManager`](https://nodejs.org/dist/latest/docs/api/all.html#all_packages_packagemanager) definition and use that start your app. The default package manager is `npm` and the default script is `start`. You can run any script in your applications `package.json` with `opx <args>`.
+It will check [`packageManager`](https://nodejs.org/dist/latest/docs/api/all.html#all_packages_packagemanager) definition and use that to start your app. The default package manager is `npm` and the default script is `dev`. You can override the default script with `opx.defaultScript` in `package.json`.
+
+```json
+{
+  "opx": {
+    "defaultScript": "start"
+  }
+}
+```
+
+You can run any script in your applications `package.json` with `opx <args>`.
 
 
 Example running this [demo application](https://github.com/Hacksore/demo-1pass-secrets).
@@ -44,9 +54,9 @@ $ opx
 [OPX] Forcing terminal colors with FORCE_COLOR=1
 [OPX] op run \
         --env-file=apps/demo/.env \
-        --env-file=apps/other-app/.env -- pnpm start
-demo:start: Hello this is a sample app that uses a secret from 1password cli
-demo:start: Secret is: <concealed by 1Password>
-other-app:start: Hello this is a sample app that uses a secret from 1password cli
-other-app:start: Secret is: <concealed by 1Password>
+        --env-file=apps/other-app/.env -- pnpm dev
+demo:dev: Hello this is a sample app that uses a secret from 1password cli
+demo:dev: Secret is: <concealed by 1Password>
+other-app:dev: Hello this is a sample app that uses a secret from 1password cli
+other-app:dev: Secret is: <concealed by 1Password>
 ```

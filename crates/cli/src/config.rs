@@ -2,11 +2,16 @@ use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::env;
 use std::fs;
+use std::path::Path;
 use tracing::{debug, warn};
+
+const DEFAULT_PACKAGE_MANAGER: &str = "npm";
+const DEFAULT_SCRIPT: &str = "dev";
 
 #[derive(Debug)]
 pub struct OpxConfig {
   pub package_manager: String,
+  pub default_script: String,
 }
 
 /// The filename for the package.json
@@ -14,6 +19,54 @@ const PACKAGE_JSON_FILE: &str = "package.json";
 
 /// Used to be a config file but now this is just a way to read the package.json
 impl OpxConfig {
+  fn from_package_json(package_json: &Value, package_json_path: &Path) -> Self {
+    let mut package_manager: String = String::from(DEFAULT_PACKAGE_MANAGER);
+    let mut default_script: String = String::from(DEFAULT_SCRIPT);
+
+    if let Some(raw_package_manager) = package_json["packageManager"].as_str() {
+      package_manager = raw_package_manager
+        .split_once('@')
+        .map_or(raw_package_manager, |(manager, _)| manager)
+        .to_string();
+
+      debug!(package_manager, "Resolved package manager");
+    } else {
+      warn!(
+        package_json = %package_json_path.display(),
+        package_manager,
+        "packageManager not found in package.json; defaulting to npm.\n\nhint: Add packageManager to package.json to make this explicit."
+      );
+    }
+
+    if let Some(opx_config) = package_json.get("opx") {
+      if let Some(raw_default_script) = opx_config["defaultScript"].as_str() {
+        let configured_default_script = raw_default_script.trim();
+
+        if configured_default_script.is_empty() {
+          warn!(
+            package_json = %package_json_path.display(),
+            default_script,
+            "opx.defaultScript in package.json is empty; defaulting to dev.\n\nhint: Set opx.defaultScript to a package script name like `start` or `server`."
+          );
+        } else {
+          default_script = configured_default_script.to_string();
+          debug!(default_script, "Resolved default script");
+        }
+      } else if !opx_config.is_object() {
+        warn!(
+          package_json = %package_json_path.display(),
+          default_script,
+          "opx in package.json must be an object; defaulting to dev.\n\nhint: Configure it as `\"opx\": {{ \"defaultScript\": \"start\" }}`."
+        );
+      }
+    }
+
+    OpxConfig {
+      package_manager,
+      default_script,
+    }
+  }
+
   pub fn new() -> Result<Self> {
     let current_dir = env::current_dir().context(
       "Failed to determine the current working directory.\n\nhint: Run opx from a project directory that still exists on disk.",
@@ -44,24 +97,7 @@ impl OpxConfig {
         package_json_path.display()
       )
     })?;
-    let mut package_manager: String = String::from("npm");
-
-    if let Some(raw_package_manager) = package_json["packageManager"].as_str() {
-      package_manager = raw_package_manager
-        .split_once('@')
-        .map_or(raw_package_manager, |(manager, _)| manager)
-        .to_string();
-
-      debug!(package_manager, "Resolved package manager");
-    } else {
-      warn!(
-        package_json = %package_json_path.display(),
-        package_manager,
-        "packageManager not found in package.json; defaulting to npm.\n\nhint: Add packageManager to package.json to make this explicit."
-      );
-    }
-
-    let instance = OpxConfig { package_manager };
+    let instance = OpxConfig::from_package_json(&package_json, &package_json_path);
 
     // Initialize default values for your properties
     Ok(instance)
@@ -70,5 +106,63 @@ impl OpxConfig {
   /// Get the package manager from the package.json
   pub fn get_package_manager(&self) -> &str {
     &self.package_manager
+  }
+
+  /// Get the default script from package.json opx config
+  pub fn get_default_script(&self) -> &str {
+    &self.default_script
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::OpxConfig;
+  use serde_json::json;
+  use std::path::Path;
+
+  fn parse(package_json: serde_json::Value) -> OpxConfig {
+    OpxConfig::from_package_json(&package_json, Path::new("package.json"))
+  }
+
+  #[test]
+  fn defaults_to_npm_and_dev_without_package_overrides() {
+    let config = parse(json!({}));
+
+    assert_eq!(config.get_package_manager(), "npm");
+    assert_eq!(config.get_default_script(), "dev");
+  }
+
+  #[test]
+  fn reads_package_manager_without_version_suffix() {
+    let config = parse(json!({
+      "packageManager": "pnpm@10.0.0"
+    }));
+
+    assert_eq!(config.get_package_manager(), "pnpm");
+    assert_eq!(config.get_default_script(), "dev");
+  }
+
+  #[test]
+  fn reads_default_script_from_opx_config() {
+    let config = parse(json!({
+      "packageManager": "yarn@4.0.0",
+      "opx": {
+        "defaultScript": "start"
+      }
+    }));
+
+    assert_eq!(config.get_package_manager(), "yarn");
+    assert_eq!(config.get_default_script(), "start");
+  }
+
+  #[test]
+  fn ignores_empty_default_script() {
+    let config = parse(json!({
+      "opx": {
+        "defaultScript": " "
+      }
+    }));
+
+    assert_eq!(config.get_default_script(), "dev");
   }
 }

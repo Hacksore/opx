@@ -17,7 +17,7 @@ The command should resolve `--prod` to the production environment, load the corr
 Today, `opx` recursively finds files named exactly `.env` and passes them to `op run`:
 
 ```sh
-op run --env-file=.env --env-file=apps/web/.env -- pnpm start
+op run --env-file=.env --env-file=apps/web/.env -- pnpm dev
 ```
 
 This works for a single environment, but it does not handle common cases where the same app needs different credentials for local, preview, staging, and production.
@@ -122,24 +122,19 @@ packages/api/.env.prod
 For `opx db:push --prod`, load:
 
 ```txt
-.env
 .env.prod
-apps/web/.env
 apps/web/.env.prod
-packages/api/.env
 packages/api/.env.prod
 ```
 
-This makes `.env` the shared baseline and `.env.<environment>` the selected overlay.
+This makes `.env` the default file set and `.env.<environment>` the selected environment file set.
 
 ## File Precedence
 
 Recommended precedence, from lowest to highest:
 
-1. Root `.env`
-2. Nested `.env`
-3. Root `.env.<environment>`
-4. Nested `.env.<environment>`
+1. Root selected env file
+2. Nested selected env files
 
 If duplicate variables appear, later files win according to the order passed to `op run`.
 
@@ -147,7 +142,7 @@ If duplicate variables appear, later files win according to the order passed to 
 
 ```txt
 [OPX] Duplicate env vars detected; later files win:
-[OPX] DATABASE_URL: .env, apps/web/.env.prod
+[OPX] DATABASE_URL: .env.prod, apps/web/.env.prod
 ```
 
 ## 1Password Secret Reference Patterns
@@ -216,9 +211,7 @@ Recommendation: avoid interpolation for the first implementation. Prefer native 
 Use file names only:
 
 ```txt
-.env
 .env.prod
-apps/web/.env
 apps/web/.env.prod
 ```
 
@@ -291,8 +284,8 @@ Implement convention-based environment selection:
 - Parse built-in aliases like `--prod`.
 - Strip consumed `opx` flags before forwarding command args.
 - Preserve everything after `--` as package manager args.
-- Discover `.env` files plus `.env.<selected-env>` files.
-- For `prod`, also consider `.env.production`.
+- Discover `.env` files by default, or `.env.<selected-env>` files when an environment is selected.
+- For `prod`, load `.env.prod`; `.env.production` remains a future alias decision.
 - Print selected environment:
 
 ```txt
@@ -317,17 +310,14 @@ opx db:push --prod
    - Remove `--prod` from forwarded args.
 3. Discover candidate files recursively, skipping `.git` and `node_modules`.
 4. Include files whose names are:
-   - `.env`
    - `.env.prod`
-   - `.env.production`
 5. Sort files by precedence:
-   - baseline `.env` before environment files
    - shallower paths before deeper paths
    - stable lexical ordering within each group
 6. Run:
 
 ```sh
-op run --env-file=.env --env-file=.env.prod -- pnpm db:push
+op run --env-file=.env.prod -- pnpm db:push
 ```
 
 ## Open Questions
@@ -363,4 +353,3 @@ op run --env-file=.env --env-file=.env.prod -- pnpm db:push
 - The final printed `op run` command clearly shows which env files were passed.
 - Duplicate variable warnings do not reveal secret values.
 - Documentation explains the tradeoffs between separate secret names, separate vaults, and config-driven mapping.
-

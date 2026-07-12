@@ -4,7 +4,7 @@ use std::env;
 use std::ffi::OsString;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tracing::{debug, info, warn};
 use walkdir::{DirEntry, WalkDir};
 
@@ -125,13 +125,9 @@ pub fn parse_cli_args(args: Vec<String>) -> Result<ParsedCliArgs> {
 }
 
 fn is_valid_env_file(name: &str, selected_env: Option<&str>) -> bool {
-  if name == ".env" {
-    return true;
-  }
-
   match selected_env {
     Some(environment) => name == format!(".env.{environment}"),
-    None => false,
+    None => name == ".env",
   }
 }
 
@@ -147,9 +143,9 @@ pub fn is_real_env_file(entry: &DirEntry, selected_env: Option<&str>) -> bool {
 
 fn env_file_group(path: &Path, selected_env: Option<&str>) -> usize {
   match path.file_name().and_then(|name| name.to_str()) {
-    Some(".env") => 0,
+    Some(".env") if selected_env.is_none() => 0,
     Some(name) if selected_env.is_some_and(|environment| name == format!(".env.{environment}")) => {
-      1
+      0
     }
     _ => 2,
   }
@@ -225,10 +221,21 @@ pub fn run_op_command(
   debug!(env_files = ?env_file_paths, "Resolved env files");
 
   if env_files.is_empty() {
-    warn!(
-      directory = %current_dir.display(),
-      "No .env files found.\n\nhint: Add a .env file with 1Password references, for example FOO=\"op://vault/item/field\"."
-    );
+    match selected_env {
+      Some(environment) => {
+        warn!(
+          directory = %current_dir.display(),
+          environment,
+          "No .env.{environment} files found.\n\nhint: Add a .env.{environment} file with 1Password references, or run without an environment flag to load .env files."
+        );
+      }
+      None => {
+        warn!(
+          directory = %current_dir.display(),
+          "No .env files found.\n\nhint: Add a .env file with 1Password references, for example FOO=\"op://vault/item/field\"."
+        );
+      }
+    }
   }
 
   let op_env_flags: Vec<String> = env_files
@@ -258,7 +265,10 @@ pub fn run_op_command(
     .args(op_env_flags)
     .arg("--")
     .arg(package_manager)
-    .args(args);
+    .args(args)
+    .stdin(Stdio::inherit())
+    .stdout(Stdio::inherit())
+    .stderr(Stdio::inherit());
 
   let flags = op_env_flags_display.join("\n");
   let fmt_string = if flags.is_empty() {
@@ -438,21 +448,19 @@ mod tests {
   }
 
   #[test]
-  fn selected_env_includes_baseline_and_matching_stage() {
-    assert!(is_valid_env_file(".env", Some("prod")));
+  fn selected_env_only_includes_matching_stage() {
+    assert!(!is_valid_env_file(".env", Some("prod")));
     assert!(is_valid_env_file(".env.prod", Some("prod")));
     assert!(!is_valid_env_file(".env.dev", Some("prod")));
     assert!(!is_valid_env_file(".env.production", Some("prod")));
   }
 
   #[test]
-  fn env_files_sort_baseline_before_selected_stage() {
+  fn env_files_sort_selected_stage_by_shallowest_path() {
     let root = PathBuf::from("/repo");
     let mut paths = vec![
       PathBuf::from("/repo/apps/web/.env.prod"),
       PathBuf::from("/repo/.env.prod"),
-      PathBuf::from("/repo/apps/web/.env"),
-      PathBuf::from("/repo/.env"),
     ];
 
     paths.sort_by_key(|path| env_file_sort_key(path, &root, Some("prod")));
@@ -460,8 +468,6 @@ mod tests {
     assert_eq!(
       paths,
       vec![
-        PathBuf::from("/repo/.env"),
-        PathBuf::from("/repo/apps/web/.env"),
         PathBuf::from("/repo/.env.prod"),
         PathBuf::from("/repo/apps/web/.env.prod"),
       ]
