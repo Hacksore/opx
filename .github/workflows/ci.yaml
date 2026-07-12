@@ -20,7 +20,7 @@ jobs:
           node-version: 20
       - uses: pnpm/action-setup@v3
         with:
-          version: 8
+          version: 10.17.1
       - name: Get pnpm store directory
         shell: bash
         run: |
@@ -38,26 +38,51 @@ jobs:
         run: pnpm check:format
       - name: Lint
         run: pnpm lint
+  rust-quality:
+    name: Rust quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt,llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Check Rust format
+        working-directory: crates/cli
+        run: cargo fmt --check
+      - name: Clippy
+        working-directory: crates/cli
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Test
+        working-directory: crates/cli
+        run: cargo test --locked
+      - name: Coverage
+        working-directory: crates/cli
+        run: cargo llvm-cov --locked --all-targets --fail-under-lines 70
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: "${{ matrix.settings.host }}"
     strategy:
       fail-fast: false
       matrix:
         settings:
           - host: macos-latest
-            toolchain: aarch64-apple-darwin,x86_64-apple-darwin
+            target: aarch64-apple-darwin
+          - host: macos-latest
+            target: x86_64-apple-darwin
           - host: windows-latest
-            toolchain: x86_64-pc-windows-msvc
+            target: x86_64-pc-windows-msvc
           - host: ubuntu-latest
-            toolchain: x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-gnu
 
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          target: "${{ matrix.settings.toolchain }}"
+          target: "${{ matrix.settings.target }}"
       - name: Build
         working-directory: crates/cli
-        run: cargo build --release
+        run: cargo build --locked --release --target "${{ matrix.settings.target }}"

@@ -67,12 +67,8 @@ impl OpxConfig {
     }
   }
 
-  pub fn new() -> Result<Self> {
-    let current_dir = env::current_dir().context(
-      "Failed to determine the current working directory.\n\nhint: Run opx from a project directory that still exists on disk.",
-    )?;
-
-    let mut package_json_path = current_dir.clone();
+  fn from_directory(current_dir: &Path) -> Result<Self> {
+    let mut package_json_path = current_dir.to_path_buf();
     // add the file config name
     package_json_path.push(PACKAGE_JSON_FILE);
 
@@ -103,6 +99,14 @@ impl OpxConfig {
     Ok(instance)
   }
 
+  pub fn new() -> Result<Self> {
+    let current_dir = env::current_dir().context(
+      "Failed to determine the current working directory.\n\nhint: Run opx from a project directory that still exists on disk.",
+    )?;
+
+    Self::from_directory(&current_dir)
+  }
+
   /// Get the package manager from the package.json
   pub fn get_package_manager(&self) -> &str {
     &self.package_manager
@@ -118,6 +122,7 @@ impl OpxConfig {
 mod tests {
   use super::OpxConfig;
   use serde_json::json;
+  use std::fs;
   use std::path::Path;
 
   fn parse(package_json: serde_json::Value) -> OpxConfig {
@@ -164,5 +169,46 @@ mod tests {
     }));
 
     assert_eq!(config.get_default_script(), "dev");
+  }
+
+  #[test]
+  fn new_errors_when_package_json_is_missing() {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let error = OpxConfig::from_directory(temp_dir.path()).unwrap_err();
+
+    assert!(error.to_string().contains("Failed to find package.json"));
+    assert!(error
+      .to_string()
+      .contains(temp_dir.path().to_string_lossy().as_ref()));
+  }
+
+  #[test]
+  fn new_errors_when_package_json_is_invalid_json() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    fs::write(temp_dir.path().join("package.json"), "{").unwrap();
+
+    let error = OpxConfig::from_directory(temp_dir.path()).unwrap_err();
+
+    assert!(error
+      .to_string()
+      .contains("Failed to parse package.json as JSON"));
+  }
+
+  #[cfg(unix)]
+  #[test]
+  fn new_errors_when_package_json_is_unreadable() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let package_json_path = temp_dir.path().join("package.json");
+    fs::write(&package_json_path, "{}").unwrap();
+    fs::set_permissions(&package_json_path, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let error = OpxConfig::from_directory(temp_dir.path()).unwrap_err();
+
+    fs::set_permissions(&package_json_path, fs::Permissions::from_mode(0o600)).unwrap();
+
+    assert!(error.to_string().contains("Failed to read package.json"));
   }
 }
