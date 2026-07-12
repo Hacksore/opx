@@ -94,7 +94,11 @@ fn runs_default_script_through_mocked_op() {
     .env("OPX_MOCK_FORCE_COLOR", &force_color_file)
     .env("OPX_MOCK_EXIT", "0")
     .assert()
-    .success();
+    .success()
+    .stderr(predicates::str::contains(format!(
+      "opx v{}",
+      env!("CARGO_PKG_VERSION")
+    )));
 
   assert_eq!(
     read_lines(args_file),
