@@ -5,6 +5,8 @@
   "scripts": {
     "start": "turbo start",
     "build": "turbo run build",
+    "test:cli": "cargo test --manifest-path crates/cli/Cargo.toml",
+    "test:pretty": "cd crates/cli && cargo testdox",
     "check:format": "turbo run check:format",
     "clean": "turbo run clean && rm -rf node_modules .turbo",
     "lint": "turbo run lint",

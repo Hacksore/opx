@@ -139,6 +139,23 @@ cargo watch -x "build --release"
 export PATH="$HOME/code/opx/crates/cli/target/release:$PATH"
 ```
 
+### Tests
+
+Run the standard Rust test harness:
+
+```sh
+cargo test
+```
+
+For more readable test output, install `cargo-testdox` once and run the pretty test command:
+
+```sh
+cargo install cargo-testdox
+pnpm test:pretty
+```
+
+The tests stay idiomatic Rust `snake_case`; `cargo-testdox` formats those names as readable sentences in the output.
+
 ### Considerations
 - How do you handle duplicate env vars?
 - Should `.env.production` alias `.env.prod`?
