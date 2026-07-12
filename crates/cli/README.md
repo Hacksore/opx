@@ -32,7 +32,7 @@ If your package script would recurse back into `opx`, configure a raw command in
     "dev": "opx"
   },
   "opx": {
-    "defaultCommand": "next dev"
+    "defaultCommand": "npx next dev"
   }
 }
 ```
@@ -40,18 +40,10 @@ If your package script would recurse back into `opx`, configure a raw command in
 That runs:
 
 ```sh
-op run --env-file=.env -- next dev
+op run --env-file=.env -- npx next dev
 ```
 
-Because `defaultCommand` runs directly, it does not automatically add your Node project's local `node_modules/.bin` directory to `PATH`. If you want to run a project-local binary, use your package runner, for example:
-
-```json
-{
-  "opx": {
-    "defaultCommand": "npx next dev"
-  }
-}
-```
+Because `defaultCommand` runs directly, it does not automatically add your Node project's local `node_modules/.bin` directory to `PATH`. If you want to run a project-local binary, use your package runner, such as `npx`, `pnpm exec`, or `yarn exec`.
 
 For exact argument control, `defaultCommand` can also be an array:
 
