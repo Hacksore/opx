@@ -11,7 +11,6 @@ use walkdir::{DirEntry, WalkDir};
 const FORCE_COLOR: &str = "FORCE_COLOR";
 pub const OPX_ALLOW_NESTED: &str = "OPX_ALLOW_NESTED";
 pub const OPX_DEPTH: &str = "OPX_DEPTH";
-const OPX_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PROD_ENV: &str = "prod";
 const DEV_ENV: &str = "dev";
 const STAGING_ENV: &str = "staging";
@@ -322,7 +321,7 @@ pub fn run_op_command(
     command = %command_display,
     environment = selected_env.unwrap_or("default"),
     env_file_count = env_file_paths.len(),
-    "Running command through 1Password with opx v{OPX_VERSION}"
+    "Running command through 1Password"
   );
   log_debug_lines(&fmt_string);
 

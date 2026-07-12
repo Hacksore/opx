@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use predicates::prelude::*;
 use std::env;
 use std::ffi::OsString;
 use std::fs;
@@ -216,10 +217,24 @@ fn runs_selected_environment_and_preserves_command_args_after_separator() {
 fn fails_when_package_json_is_missing() {
   let temp_dir = tempfile::tempdir().unwrap();
 
-  opx_command(temp_dir.path())
-    .assert()
-    .failure()
-    .stderr(predicates::str::contains("Failed to find package.json"));
+  let assert = opx_command(temp_dir.path()).assert().failure().stderr(
+    predicates::str::contains("ERROR").count(1).and(
+      predicates::str::contains("Failed to find package.json.")
+        .and(predicates::str::contains(
+          "opx reads package.json to choose which package manager to run.",
+        ))
+        .and(predicates::str::contains(" hint "))
+        .and(predicates::str::contains("Run opx from the root")),
+    ),
+  );
+  let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+  let startup_index = stderr.find("opx v").unwrap();
+  let error_index = stderr.find("ERROR").unwrap();
+
+  assert!(
+    startup_index < error_index,
+    "startup banner should be printed before errors\n{stderr}"
+  );
 }
 
 #[test]
