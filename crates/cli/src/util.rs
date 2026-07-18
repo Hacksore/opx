@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use std::cmp::Ordering;
 use std::env;
 use std::ffi::OsString;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tracing::{debug, info, warn};
@@ -24,6 +24,7 @@ fn log_debug_lines(message: &str) {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParsedCliArgs {
   pub selected_env: Option<String>,
+  pub tty: bool,
   pub command_args: Vec<String>,
 }
 
@@ -32,6 +33,20 @@ fn restore_force_color(original_force_color: Option<OsString>) {
     Some(value) => env::set_var(FORCE_COLOR, value),
     None => env::remove_var(FORCE_COLOR),
   }
+}
+
+fn should_use_pty_proxy(tty_requested: bool) -> Result<bool> {
+  if !tty_requested {
+    return Ok(false);
+  }
+
+  if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+    bail!(
+      "TTY mode requires an interactive terminal.\n\nwhy: --tty was requested, but stdin or stdout is not connected to a terminal.\nhint: Run opx --tty directly from an interactive shell."
+    );
+  }
+
+  Ok(true)
 }
 
 fn current_opx_depth() -> Result<u32> {
@@ -111,6 +126,7 @@ fn select_environment(selected_env: &mut Option<String>, environment: &str) -> R
 
 pub fn parse_cli_args(args: Vec<String>) -> Result<ParsedCliArgs> {
   let mut selected_env: Option<String> = None;
+  let mut tty = false;
   let mut command_args: Vec<String> = vec![];
   let mut index = 0;
 
@@ -140,6 +156,12 @@ pub fn parse_cli_args(args: Vec<String>) -> Result<ParsedCliArgs> {
       continue;
     }
 
+    if arg == "--tty" {
+      tty = true;
+      index += 1;
+      continue;
+    }
+
     if let Some(environment) = arg.strip_prefix("--env=") {
       select_environment(&mut selected_env, environment)?;
       index += 1;
@@ -158,6 +180,7 @@ pub fn parse_cli_args(args: Vec<String>) -> Result<ParsedCliArgs> {
 
   Ok(ParsedCliArgs {
     selected_env,
+    tty,
     command_args,
   })
 }
@@ -234,6 +257,7 @@ pub fn run_op_command(
   env_files: Vec<DirEntry>,
   command_args: Vec<String>,
   selected_env: Option<&str>,
+  tty_requested: bool,
 ) -> Result<()> {
   if command_args.is_empty() {
     bail!("Missing command to run.\n\nhint: Pass a command to opx, or configure `opx.defaultScript` / `opx.defaultCommand` in package.json.");
@@ -299,13 +323,37 @@ pub fn run_op_command(
 
   let command_display = command_args.join(" ");
 
+  let use_pty_proxy = should_use_pty_proxy(tty_requested)?;
+  let mut proxied_command_args = Vec::new();
+
+  if use_pty_proxy {
+    proxied_command_args.push(
+      env::current_exe()
+        .context("Failed to locate the opx executable for the experimental PTY proxy.")?
+        .into_os_string(),
+    );
+    proxied_command_args.push(OsString::from(crate::pty_proxy::PTY_PROXY_ARG));
+    proxied_command_args.extend(command_args.iter().map(OsString::from));
+  }
+
   let mut binding = Command::new("op");
   let command = binding
     .env(OPX_DEPTH, (current_opx_depth()? + 1).to_string())
-    .arg("run")
-    .args(op_env_flags)
-    .arg("--")
-    .args(&command_args)
+    .arg("run");
+
+  if use_pty_proxy {
+    command.arg("--no-masking");
+  }
+
+  let command = command.args(op_env_flags).arg("--");
+
+  if use_pty_proxy {
+    command.args(&proxied_command_args);
+  } else {
+    command.args(&command_args);
+  }
+
+  let command = command
     .stdin(Stdio::inherit())
     .stdout(Stdio::inherit())
     .stderr(Stdio::inherit());
@@ -323,6 +371,12 @@ pub fn run_op_command(
     env_file_count = env_file_paths.len(),
     "Running command through 1Password"
   );
+  if use_pty_proxy {
+    warn!(
+      "TTY mode disables 1Password output masking; secrets printed by the command will be visible"
+    );
+    debug!("Using pseudo-terminal proxy");
+  }
   log_debug_lines(&fmt_string);
 
   let mut command_spawn = match command.spawn() {

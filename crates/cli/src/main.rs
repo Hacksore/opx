@@ -3,6 +3,7 @@
 mod config;
 #[cfg(test)]
 mod main_tests;
+mod pty_proxy;
 mod util;
 
 use crate::util::{ensure_not_nested_opx, get_env_files, parse_cli_args, run_op_command};
@@ -164,6 +165,7 @@ fn error_code_for_summary(summary: &str) -> &'static str {
     "Missing environment name." => "EOPX_MISSING_ENV",
     "Multiple environments were selected." => "EOPX_MULTIPLE_ENVS",
     "Missing environment after --env." => "EOPX_MISSING_ENV",
+    "TTY mode requires an interactive terminal." => "EOPX_TTY_REQUIRED",
     "Missing command to run." => "EOPX_MISSING_COMMAND",
     "Failed to start 1Password CLI `op`." => "EOPX_OP_NOT_FOUND",
     "Failed to start command through `op run`." => "EOPX_OP_START_FAILED",
@@ -263,6 +265,19 @@ fn default_command_args(config: &OpxConfig) -> Vec<String> {
 }
 
 fn main() -> ExitCode {
+  let mut raw_args = env::args_os();
+  let _program = raw_args.next();
+
+  if raw_args.next().as_deref() == Some(std::ffi::OsStr::new(pty_proxy::PTY_PROXY_ARG)) {
+    return match pty_proxy::run(raw_args.collect()) {
+      Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
+      Err(error) => {
+        eprintln!("opx PTY proxy failed: {error:#}");
+        ExitCode::FAILURE
+      }
+    };
+  }
+
   init_logging();
   log_startup_banner();
 
@@ -302,7 +317,12 @@ fn run() -> Result<()> {
     args => package_manager_command(config.get_package_manager(), args),
   };
 
-  run_op_command(env_files, op_command, parsed_args.selected_env.as_deref())?;
+  run_op_command(
+    env_files,
+    op_command,
+    parsed_args.selected_env.as_deref(),
+    parsed_args.tty,
+  )?;
 
   Ok(())
 }

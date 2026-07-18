@@ -128,14 +128,15 @@ exit /B %OPX_MOCK_EXIT%
 }
 
 #[test]
-fn parse_cli_args_selects_environment_and_preserves_separator_args() {
-  let parsed = parse_cli_args(args(&["--prod", "--", "db:push", "--prod"])).unwrap();
+fn parse_cli_args_selects_environment_tty_and_preserves_separator_args() {
+  let parsed = parse_cli_args(args(&["--tty", "--prod", "--", "db:push", "--tty"])).unwrap();
 
   assert_eq!(
     parsed,
     ParsedCliArgs {
       selected_env: Some("prod".to_string()),
-      command_args: args(&["db:push", "--prod"]),
+      tty: true,
+      command_args: args(&["db:push", "--tty"]),
     }
   );
 }
@@ -227,7 +228,7 @@ fn run_op_command_constructs_op_run_and_restores_process_state() {
   env::set_var("OPX_MOCK_OPX_DEPTH", &opx_depth_file);
   env::set_var("OPX_MOCK_EXIT", "0");
 
-  run_op_command(env_files, args(&["npm", "run", "dev"]), None).unwrap();
+  run_op_command(env_files, args(&["npm", "run", "dev"]), None, false).unwrap();
 
   let recorded_args = fs::read_to_string(args_file).unwrap();
   assert_eq!(
@@ -264,7 +265,7 @@ fn run_op_command_restores_force_color_when_op_is_missing_or_child_fails() {
   env::set_var("PATH", &empty_bin_dir);
   env::set_var(FORCE_COLOR, "false");
 
-  let error = run_op_command(vec![], args(&["pnpm", "dev"]), None).unwrap_err();
+  let error = run_op_command(vec![], args(&["pnpm", "dev"]), None, false).unwrap_err();
 
   assert!(error
     .to_string()
@@ -281,7 +282,7 @@ fn run_op_command_restores_force_color_when_op_is_missing_or_child_fails() {
   env::set_var("OPX_MOCK_FORCE_COLOR", &force_color_file);
   env::set_var("OPX_MOCK_EXIT", "7");
 
-  let error = run_op_command(vec![], args(&["pnpm", "dev"]), None).unwrap_err();
+  let error = run_op_command(vec![], args(&["pnpm", "dev"]), None, false).unwrap_err();
 
   assert!(error
     .to_string()

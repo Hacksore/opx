@@ -92,6 +92,14 @@ If the command you are running needs its own `--prod` flag, put command args aft
 opx --env prod -- db:push --prod
 ```
 
+For commands with interactive terminal prompts or TUIs, enable PTY mode:
+
+```sh
+opx --tty db:push --force
+```
+
+TTY mode disables 1Password output masking so interactive screen updates are not buffered. Secrets printed by the command will be visible in the terminal.
+
 ### Demo
 Working example of it doing the correct thing in a demo repo:
 ```
