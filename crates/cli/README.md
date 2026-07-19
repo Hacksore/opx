@@ -100,7 +100,10 @@ For commands with interactive terminal prompts or TUIs, enable PTY mode:
 opx --tty db:push --force
 ```
 
-TTY mode disables 1Password output masking so interactive screen updates are not buffered. Secrets printed by the command will be visible in the terminal.
+> [!WARNING]
+> `--tty` disables 1Password's output masking. Secret injection still works, but any secret printed by the command will be visible in plaintext and may remain in terminal scrollback, recordings, or logs. Only use `--tty` with commands you trust not to print secrets.
+
+`opx` has to invoke `op run --no-masking` in TTY mode because 1Password's masking layer buffers command output while scanning it for secrets. Interactive prompts and TUIs need an immediate PTY byte stream for input, cursor movement, and screen redraws; buffering that stream can make them stall or render incorrectly. Disabling masking lets `opx` proxy the terminal directly to the child process.
 
 ### Demo
 Working example of it doing the correct thing in a demo repo:
