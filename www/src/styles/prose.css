@@ -1,5 +1,10 @@
-/** back tics for codies **/
 /** biome-ignore-all lint/complexity/noImportantStyles: required to override the theme */
+/** biome-ignore-all lint/suspicious/noUnknownAtRules: Tailwind directives are processed by PostCSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/** back tics for codies **/
 .prose :where(code):not(:where([class~="not-prose"] *))::after {
   content: none !important;
 }
