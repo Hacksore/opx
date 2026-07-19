@@ -86,6 +86,8 @@ opx --dev dev
 opx --staging start
 ```
 
+Selecting `prod` with either `--prod` or `--env prod` prints a production-secrets warning and requires typing the exact lowercase word `yes`. Short forms such as `y` and uppercase variants are rejected before 1Password is invoked.
+
 If the command you are running needs its own `--prod` flag, put command args after `--`:
 
 ```sh

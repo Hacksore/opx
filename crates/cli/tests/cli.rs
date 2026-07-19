@@ -189,13 +189,34 @@ fn runs_selected_environment_and_preserves_command_args_after_separator() {
   let canonical_project_dir = fs::canonicalize(project_dir).unwrap();
 
   opx_command(project_dir)
+    .args(["--prod", "db:push"])
+    .write_stdin("y\n")
+    .env("PATH", prepend_path(&bin_dir))
+    .env("OPX_MOCK_ARGS", &args_file)
+    .env("OPX_MOCK_FORCE_COLOR", &force_color_file)
+    .assert()
+    .failure()
+    .stderr(
+      predicates::str::contains("YOU ARE LOADING PRODUCTION SECRETS 🚨")
+        .and(predicates::str::contains("EOPX_PROD_CONFIRMATION")),
+    );
+  assert!(
+    !args_file.exists(),
+    "op must not run without exact confirmation"
+  );
+
+  opx_command(project_dir)
     .args(["--prod", "--", "db:push", "--prod"])
+    .write_stdin("yes\n")
     .env("PATH", prepend_path(&bin_dir))
     .env("OPX_MOCK_ARGS", &args_file)
     .env("OPX_MOCK_FORCE_COLOR", &force_color_file)
     .env("OPX_MOCK_EXIT", "0")
     .assert()
-    .success();
+    .success()
+    .stderr(predicates::str::contains(
+      "YOU ARE LOADING PRODUCTION SECRETS 🚨",
+    ));
 
   assert_eq!(
     read_lines(args_file),

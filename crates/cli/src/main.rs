@@ -12,10 +12,12 @@ use anyhow::{bail, Context, Result};
 use config::OpxConfig;
 use dirs::home_dir;
 use std::env;
+use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+use unicode_width::UnicodeWidthStr;
 
 const OPX_VERSION: &str = env!("CARGO_PKG_VERSION");
 const STYLE_DIM: Style = Style::new().dimmed();
@@ -34,6 +36,10 @@ const STYLE_CYAN_BADGE: Style = AnsiColor::Black
 const STYLE_YELLOW_BADGE: Style = AnsiColor::Black
   .on_default()
   .bg_color(Some(Color::Ansi(AnsiColor::Yellow)))
+  .effects(anstyle::Effects::BOLD);
+const STYLE_PROD_WARNING: Style = AnsiColor::BrightBlack
+  .on_default()
+  .bg_color(Some(Color::Ansi(AnsiColor::Red)))
   .effects(anstyle::Effects::BOLD);
 
 fn init_logging() {
@@ -165,6 +171,7 @@ fn error_code_for_summary(summary: &str) -> &'static str {
     "Missing environment name." => "EOPX_MISSING_ENV",
     "Multiple environments were selected." => "EOPX_MULTIPLE_ENVS",
     "Missing environment after --env." => "EOPX_MISSING_ENV",
+    "Production secrets were not confirmed." => "EOPX_PROD_CONFIRMATION",
     "TTY mode requires an interactive terminal." => "EOPX_TTY_REQUIRED",
     "Missing command to run." => "EOPX_MISSING_COMMAND",
     "Failed to start 1Password CLI `op`." => "EOPX_OP_NOT_FOUND",
@@ -264,6 +271,57 @@ fn default_command_args(config: &OpxConfig) -> Vec<String> {
   )
 }
 
+fn production_banner_lines() -> [String; 2] {
+  let messages = [
+    "🚨 YOU ARE LOADING PRODUCTION SECRETS 🚨",
+    "Commands may affect live systems and customer data.",
+  ];
+  let content_width = messages
+    .iter()
+    .map(|message| UnicodeWidthStr::width(*message))
+    .max()
+    .unwrap_or_default();
+
+  messages.map(|message| {
+    let trailing_padding = content_width - UnicodeWidthStr::width(message);
+    format!("  {message}{}  ", " ".repeat(trailing_padding))
+  })
+}
+
+fn confirm_production(reader: &mut impl BufRead, writer: &mut impl Write) -> Result<()> {
+  writeln!(writer)?;
+  for line in production_banner_lines() {
+    writeln!(writer, "{}", styled(STYLE_PROD_WARNING, line))?;
+  }
+  write!(
+    writer,
+    "\n{} Type the exact word `yes` to continue: ",
+    styled(STYLE_YELLOW_BADGE, " CONFIRM ")
+  )?;
+  writer.flush()?;
+
+  let mut confirmation = String::new();
+  reader.read_line(&mut confirmation)?;
+
+  if confirmation.trim_end_matches(['\r', '\n']) != "yes" {
+    bail!(
+      "Production secrets were not confirmed.\n\nwhy: production access requires the exact lowercase confirmation `yes`; `y`, `Y`, and `YES` are rejected.\nhint: Run the command again and type `yes` to continue."
+    );
+  }
+
+  Ok(())
+}
+
+fn confirm_production_if_selected(selected_env: Option<&str>) -> Result<()> {
+  if selected_env != Some("prod") {
+    return Ok(());
+  }
+
+  let stdin = io::stdin();
+  let stderr = io::stderr();
+  confirm_production(&mut stdin.lock(), &mut stderr.lock())
+}
+
 fn main() -> ExitCode {
   let mut raw_args = env::args_os();
   let _program = raw_args.next();
@@ -306,6 +364,7 @@ fn run() -> Result<()> {
   let cli_args = env::args().skip(1).collect::<Vec<String>>();
   let parsed_args = parse_cli_args(cli_args)?;
   ensure_not_nested_opx()?;
+  confirm_production_if_selected(parsed_args.selected_env.as_deref())?;
 
   // NOTE: this is expensive
   let env_files = get_env_files(parsed_args.selected_env.as_deref())?;
